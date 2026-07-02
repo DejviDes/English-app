@@ -3,8 +3,8 @@
 import { writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 
-const INDIGO = [99, 102, 241]; // #6366f1
-const VIOLET = [124, 58, 237]; // #7c3aed
+const INDIGO = [30, 181, 103]; // Lingua green-500 #1eb567
+const VIOLET = [18, 124, 71]; // Lingua green-700 #127c47
 
 const lerp = (a, b, t) => Math.round(a + (b - a) * t);
 
