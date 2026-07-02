@@ -13,6 +13,9 @@ export default function InstallHint() {
       window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true;
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (isIOS && !isStandalone && !localStorage.getItem('install-hint-dismissed')) {
+      // Client-only detection (matchMedia/navigator/localStorage) — must run after
+      // mount; a one-time post-mount setState is intended here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShow(true);
     }
   }, []);

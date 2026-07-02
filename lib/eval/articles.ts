@@ -1,5 +1,5 @@
 // Detect when the ONLY difference between two answers is an English article.
-import { normalize } from './normalize';
+// Inputs are expected to be already normalized (see normalize.ts).
 
 const ARTICLES = new Set(['a', 'an', 'the']);
 
