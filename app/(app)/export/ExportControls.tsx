@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { exportAttempts } from '@/app/actions/export';
+import { AppHeader, Button, Card } from '@/components/ui/primitives';
+import { InlineMessage } from '@/components/ui/feedback';
+import { Checkbox, Input } from '@/components/ui/forms';
 
 export default function ExportControls() {
   const [from, setFrom] = useState('');
@@ -14,11 +17,7 @@ export default function ExportControls() {
     setPending(true);
     setCount(null);
     try {
-      const data = await exportAttempts({
-        from: from || undefined,
-        to: to || undefined,
-        only_wrong: onlyWrong,
-      });
+      const data = await exportAttempts({ from: from || undefined, to: to || undefined, only_wrong: onlyWrong });
       setCount(data.summary.total);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -33,39 +32,25 @@ export default function ExportControls() {
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm text-slate-500">
-          From
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="rounded-xl bg-slate-50 px-3 py-2 text-slate-800 ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-300"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-slate-500">
-          To
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="rounded-xl bg-slate-50 px-3 py-2 text-slate-800 ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-300"
-          />
-        </label>
-      </div>
-      <label className="flex items-center gap-2 text-sm text-slate-600">
-        <input type="checkbox" checked={onlyWrong} onChange={(e) => setOnlyWrong(e.target.checked)} />
-        Only mistakes (wrong + almost)
-      </label>
-      <button
-        onClick={run}
-        disabled={pending}
-        className="rounded-2xl bg-indigo-600 px-5 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-40"
-      >
-        {pending ? 'Exporting…' : 'Export attempts JSON'}
-      </button>
-      {count !== null && <p className="text-center text-sm text-slate-500">Exported {count} attempt(s).</p>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <AppHeader title="Export" subtitle="Download your attempts as JSON" />
+      <Card padding="md">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Input label="From" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input label="To" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <Checkbox label="Only mistakes (wrong + almost)" checked={onlyWrong} onChange={(e) => setOnlyWrong(e.target.checked)} />
+          <Button variant="primary" size="lg" block onClick={run} disabled={pending}>
+            {pending ? 'Exporting…' : 'Export attempts JSON'}
+          </Button>
+          {count !== null && (
+            <InlineMessage tone="success" title={`Exported ${count} attempt(s).`} icon={<span style={{ fontSize: '18px' }}>📤</span>}>
+              Paste it into a Claude chat for error analysis.
+            </InlineMessage>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

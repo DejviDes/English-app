@@ -11,12 +11,5 @@ export default async function SessionPage() {
     payload: q.payload as RunnerItem['payload'],
   }));
 
-  return (
-    <main className="min-h-dvh bg-slate-50 px-4 py-10">
-      <h1 className="mb-8 text-center text-sm font-semibold uppercase tracking-widest text-slate-400">
-        Session
-      </h1>
-      <SessionRunner items={items} />
-    </main>
-  );
+  return <SessionRunner items={items} />;
 }

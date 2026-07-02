@@ -1,11 +1,11 @@
 export default function OfflinePage() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-slate-50 px-6 text-center">
-      <p className="text-4xl">📶</p>
-      <h1 className="text-xl font-semibold text-slate-800">You&apos;re offline</h1>
-      <p className="max-w-xs text-sm text-slate-500">
-        This page isn&apos;t cached yet. Any answers you gave while offline are saved and will sync
-        when you&apos;re back online.
+    <main style={{ minHeight: '100dvh', background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '24px', textAlign: 'center' }}>
+      <p style={{ fontSize: '44px' }}>📶</p>
+      <h1 style={{ fontSize: 'var(--text-xl)' }}>You&apos;re offline</h1>
+      <p style={{ maxWidth: '280px', fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+        This page isn&apos;t cached yet. Answers you gave offline are saved and will sync when you&apos;re
+        back online.
       </p>
     </main>
   );

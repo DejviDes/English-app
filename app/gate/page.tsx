@@ -2,17 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button, Card } from '@/components/ui/primitives';
+import { Input } from '@/components/ui/forms';
 
 export default function GatePage() {
   const router = useRouter();
   const [secret, setSecret] = useState('');
-  const [error, setError] = useState(false);
+  const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
-    setError(false);
+    setError('');
     try {
       const res = await fetch('/api/gate', {
         method: 'POST',
@@ -23,7 +25,7 @@ export default function GatePage() {
         router.replace('/');
         router.refresh();
       } else {
-        setError(true);
+        setError('Wrong secret.');
       }
     } finally {
       setPending(false);
@@ -31,29 +33,24 @@ export default function GatePage() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4">
-      <form
-        onSubmit={onSubmit}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-100"
-      >
-        <h1 className="text-center text-xl font-semibold text-slate-800">English</h1>
-        <input
-          type="password"
-          autoFocus
-          value={secret}
-          onChange={(e) => setSecret(e.target.value)}
-          placeholder="Enter secret"
-          className="rounded-2xl bg-slate-50 px-5 py-4 text-lg text-slate-800 ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-300"
-        />
-        {error && <p className="text-center text-sm text-rose-600">Wrong secret.</p>}
-        <button
-          type="submit"
-          disabled={pending || !secret}
-          className="rounded-2xl bg-indigo-600 px-5 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-40"
-        >
-          {pending ? 'Unlocking…' : 'Unlock'}
-        </button>
-      </form>
+    <main style={{ minHeight: '100dvh', background: 'var(--bg-app)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div className="lingua-app-column">
+        <Card padding="lg">
+          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: '56px', height: '56px', margin: '0 auto 12px', borderRadius: 'var(--radius-lg)', background: 'linear-gradient(160deg,var(--green-500),var(--green-700))', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 'var(--fw-black)', boxShadow: 'var(--shadow-primary)' }}>
+                E
+              </div>
+              <h1 style={{ fontSize: 'var(--text-2xl)' }}>English</h1>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: '4px' }}>Your daily drill</p>
+            </div>
+            <Input type="password" placeholder="Enter secret" value={secret} onChange={(e) => { setSecret(e.target.value); setError(''); }} error={error || undefined} autoFocus />
+            <Button variant="primary" size="lg" block type="submit" disabled={pending || !secret}>
+              {pending ? 'Unlocking…' : 'Unlock'}
+            </Button>
+          </form>
+        </Card>
+      </div>
     </main>
   );
 }

@@ -3,30 +3,48 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const ITEMS = [
-  { href: '/dashboard', label: 'Home', icon: '🏠' },
-  { href: '/session', label: 'Drill', icon: '🎯' },
-  { href: '/add-word', label: 'Add', icon: '➕' },
-  { href: '/import', label: 'Import', icon: '📥' },
-  { href: '/export', label: 'Export', icon: '📤' },
+type IconKey = 'home' | 'drill' | 'add' | 'import' | 'export';
+
+const ICONS: Record<IconKey, React.ReactNode> = {
+  home: <><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9 21v-6h6v6" /></>,
+  drill: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="0.6" fill="currentColor" /></>,
+  add: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
+  import: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
+  export: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>,
+};
+
+const ITEMS: { href: string; label: string; icon: IconKey }[] = [
+  { href: '/dashboard', label: 'Home', icon: 'home' },
+  { href: '/session', label: 'Drill', icon: 'drill' },
+  { href: '/add-word', label: 'Add', icon: 'add' },
+  { href: '/import', label: 'Import', icon: 'import' },
+  { href: '/export', label: 'Export', icon: 'export' },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-      <ul className="mx-auto flex max-w-md items-stretch justify-around">
+    <nav
+      style={{
+        position: 'fixed', insetInline: 0, bottom: 0, zIndex: 10,
+        borderTop: '1px solid var(--border-default)',
+        background: 'rgba(255,255,255,0.88)',
+        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
+      <ul style={{ listStyle: 'none', margin: 0, padding: '6px 4px 8px', display: 'flex', justifyContent: 'space-around', alignItems: 'stretch', maxWidth: 'var(--app-max-width)', marginInline: 'auto' }}>
         {ITEMS.map((it) => {
-          const active = pathname === it.href;
+          const on = pathname === it.href;
           return (
-            <li key={it.href} className="flex-1">
+            <li key={it.href} style={{ flex: 1 }}>
               <Link
                 href={it.href}
-                className={`flex flex-col items-center gap-0.5 py-2 text-xs font-medium transition ${
-                  active ? 'text-indigo-600' : 'text-slate-400'
-                }`}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', width: '100%', padding: '6px 2px', color: on ? 'var(--primary)' : 'var(--text-faint)', fontSize: '11px', fontWeight: 'var(--fw-bold)', transition: 'color var(--dur-fast) var(--ease-out)' }}
               >
-                <span className="text-lg">{it.icon}</span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={on ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round">
+                  {ICONS[it.icon]}
+                </svg>
                 {it.label}
               </Link>
             </li>

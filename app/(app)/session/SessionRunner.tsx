@@ -1,11 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { submitAttempt, type SubmitResult } from '@/app/actions/attempts';
-import MatchingInput, { type MatchPair } from '@/components/exercises/MatchingInput';
 import { evaluateAnswer } from '@/lib/eval/evaluate';
 import type { EvaluableExercise, ExerciseType } from '@/lib/eval/types';
 import { enqueue } from '@/lib/offline/outbox';
+import { AppHeader, Badge, Button, Card } from '@/components/ui/primitives';
+import { ProgressBar, VerdictBanner } from '@/components/ui/feedback';
+import { ChoiceOption, MatchingRow, PromptCard } from '@/components/ui/exercise';
+import { Input } from '@/components/ui/forms';
 
 export interface RunnerItem {
   exerciseId: string;
@@ -16,11 +21,22 @@ export interface RunnerItem {
     hint?: string;
     options?: string[];
     correct_index?: number;
-    pairs?: MatchPair[];
+    pairs?: { left: string; right: string }[];
     correct_answer?: string;
     acceptable_answers?: string[];
   };
 }
+
+const TYPE_LABEL: Record<string, string> = {
+  vocab_en_sk: 'EN → SK',
+  vocab_sk_en: 'SK → EN',
+  vocab_fill_blank: 'Fill blank',
+  vocab_multiple_choice: 'Choose',
+  vocab_matching: 'Match',
+  grammar_fill_form: 'Verb form',
+  grammar_choose_option: 'Grammar',
+  grammar_fix_error: 'Fix error',
+};
 
 function toEvaluable(item: RunnerItem): EvaluableExercise {
   return {
@@ -34,71 +50,72 @@ function toEvaluable(item: RunnerItem): EvaluableExercise {
 function localReveal(item: RunnerItem): string {
   const p = item.payload;
   if (item.type === 'vocab_matching') return (p.pairs ?? []).map((pr) => `${pr.left} → ${pr.right}`).join(', ');
-  if (item.type === 'vocab_multiple_choice' || item.type === 'grammar_choose_option') {
-    return p.options?.[p.correct_index ?? -1] ?? p.correct_answer ?? '';
-  }
+  if (item.type === 'vocab_multiple_choice' || item.type === 'grammar_choose_option') return p.options?.[p.correct_index ?? -1] ?? p.correct_answer ?? '';
   return p.correct_answer ?? '';
 }
 
-const PROMPT_LABEL: Record<string, string> = {
-  vocab_en_sk: 'Translate to Slovak',
-  vocab_sk_en: 'Translate to English',
-  vocab_fill_blank: 'Fill in the blank',
-  grammar_fill_form: 'Put the word in the correct form',
-  grammar_fix_error: 'Fix the error in the sentence',
-  vocab_multiple_choice: 'Choose the correct option',
-  grammar_choose_option: 'Choose the correct option',
-  vocab_matching: 'Match the pairs',
-};
-
-const VERDICT_STYLE: Record<SubmitResult['verdict'], string> = {
-  correct: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  almost: 'bg-amber-50 text-amber-700 ring-amber-200',
-  wrong: 'bg-rose-50 text-rose-700 ring-rose-200',
-};
-
-const VERDICT_LABEL: Record<SubmitResult['verdict'], string> = {
-  correct: 'Correct',
-  almost: 'Almost',
-  wrong: 'Wrong',
-};
-
-function promptText(item: RunnerItem): string {
-  return item.payload.sentence ?? item.payload.prompt ?? '';
-}
-
-const isChoice = (type: string) =>
-  type === 'vocab_multiple_choice' || type === 'grammar_choose_option';
-
 export default function SessionRunner({ items }: { items: RunnerItem[] }) {
+  const router = useRouter();
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState('');
+  const [picked, setPicked] = useState<number | null>(null);
+  const [match, setMatch] = useState<Record<string, string>>({});
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [pending, setPending] = useState(false);
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-md rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-100">
-        <p className="text-lg font-medium text-slate-700">Nothing to drill right now.</p>
-        <p className="mt-2 text-sm text-slate-500">
-          Import a batch of exercises to get started.
-        </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <AppHeader title="Drill" onBack={() => router.push('/dashboard')} />
+        <Card padding="lg" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '40px' }}>🌱</div>
+          <h2 style={{ fontSize: 'var(--text-xl)', marginTop: '8px' }}>Nothing to drill</h2>
+          <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontSize: 'var(--text-sm)' }}>
+            Import a batch of exercises to get started.
+          </p>
+          <div style={{ marginTop: '18px' }}>
+            <Link href="/import"><Button variant="primary" size="lg" block>Go to import</Button></Link>
+          </div>
+        </Card>
       </div>
     );
   }
 
   if (index >= items.length) {
     return (
-      <div className="mx-auto max-w-md rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-100">
-        <p className="text-2xl font-semibold text-slate-800">Session complete 🎉</p>
-        <p className="mt-2 text-sm text-slate-500">You reviewed {items.length} items.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <Card padding="lg" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '44px' }}>🎉</div>
+          <h2 style={{ fontSize: 'var(--text-2xl)', marginTop: '8px' }}>Session complete</h2>
+          <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontSize: 'var(--text-sm)' }}>
+            You reviewed {items.length} item{items.length === 1 ? '' : 's'}. Nice work.
+          </p>
+          <div style={{ marginTop: '20px' }}>
+            <Button variant="primary" size="lg" block onClick={() => router.push('/dashboard')}>Back to home</Button>
+          </div>
+        </Card>
       </div>
     );
   }
 
   const item = items[index];
+  const isChoice = item.type === 'vocab_multiple_choice' || item.type === 'grammar_choose_option';
+  const isMatching = item.type === 'vocab_matching';
+  const matchOptions = isMatching ? (item.payload.pairs ?? []).map((p) => p.right) : [];
+  const promptText = isMatching ? 'Match each word to its Slovak meaning' : (item.payload.sentence ?? item.payload.prompt ?? '');
 
-  async function onSubmit(value: string) {
+  function reset() {
+    setAnswer('');
+    setPicked(null);
+    setMatch({});
+    setResult(null);
+  }
+  function next() {
+    reset();
+    setIndex((i) => i + 1);
+  }
+
+  async function grade(value: string) {
     if (pending || !value.trim()) return;
     setPending(true);
     const attemptId = crypto.randomUUID();
@@ -106,115 +123,96 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
       const r = await submitAttempt(item.exerciseId, value, attemptId);
       setResult(r);
     } catch {
-      // Offline or server error → evaluate locally and queue for later sync.
       const local = evaluateAnswer(toEvaluable(item), value);
       try {
-        await enqueue({
-          attemptId,
-          exerciseId: item.exerciseId,
-          userAnswer: value,
-          verdict: local.verdict,
-          reason: local.reason,
-          createdAt: new Date().toISOString(),
-        });
+        await enqueue({ attemptId, exerciseId: item.exerciseId, userAnswer: value, verdict: local.verdict, reason: local.reason, createdAt: new Date().toISOString() });
       } catch {
-        /* IndexedDB unavailable — feedback is still shown */
+        /* IndexedDB unavailable — feedback still shown */
       }
-      setResult({
-        verdict: local.verdict,
-        reason: local.reason,
-        correctAnswer: localReveal(item),
-        nextDueDate: '— will sync',
-      });
+      setResult({ verdict: local.verdict, reason: local.reason, correctAnswer: localReveal(item), nextDueDate: '— will sync' });
     } finally {
       setPending(false);
     }
   }
 
-  function next() {
-    setResult(null);
-    setAnswer('');
-    setIndex((i) => i + 1);
+  function submitMatch() {
+    grade(JSON.stringify(match));
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
-      <div className="flex items-center justify-between text-sm text-slate-400">
-        <span>
-          {index + 1} / {items.length}
-        </span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
-          {PROMPT_LABEL[item.type] ?? item.type}
-        </span>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <AppHeader
+        title={<span style={{ fontSize: 'var(--text-lg)' }}>Drill</span>}
+        onBack={() => router.push('/dashboard')}
+        right={<Badge tone="neutral">{TYPE_LABEL[item.type] ?? item.type}</Badge>}
+      />
+      <ProgressBar value={index + (result ? 1 : 0)} max={items.length} showLabel />
 
-      {promptText(item) && (
-        <div className="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-100">
-          <p className="text-center text-2xl font-semibold text-slate-800">{promptText(item)}</p>
-          {item.payload.hint && (
-            <p className="mt-2 text-center text-sm text-slate-400">({item.payload.hint})</p>
-          )}
-        </div>
-      )}
+      {promptText && <PromptCard prompt={promptText} hint={item.payload.hint} />}
 
       {!result ? (
-        item.type === 'vocab_matching' ? (
-          <MatchingInput pairs={item.payload.pairs ?? []} disabled={pending} onSubmit={onSubmit} />
-        ) : isChoice(item.type) ? (
-          <div className="grid gap-3">
-            {(item.payload.options ?? []).map((opt) => (
-              <button
-                key={opt}
-                disabled={pending}
-                onClick={() => onSubmit(opt)}
-                className="rounded-2xl bg-white px-5 py-4 text-left text-lg font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:ring-indigo-300 active:scale-[0.99] disabled:opacity-50"
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSubmit(answer);
-            }}
-            className="flex flex-col gap-3"
-          >
-            <input
-              autoFocus
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Type your answer…"
-              className="rounded-2xl bg-white px-5 py-4 text-lg text-slate-800 shadow-sm ring-1 ring-slate-200 outline-none focus:ring-2 focus:ring-indigo-300"
-            />
-            <button
-              type="submit"
-              disabled={pending || !answer.trim()}
-              className="rounded-2xl bg-indigo-600 px-5 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-indigo-500 active:scale-[0.99] disabled:opacity-40"
-            >
-              {pending ? 'Checking…' : 'Check'}
-            </button>
-          </form>
-        )
+        <>
+          {isChoice && (
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {(item.payload.options ?? []).map((opt, i) => (
+                <ChoiceOption
+                  key={opt}
+                  state={picked === i ? 'selected' : 'default'}
+                  onClick={() => { setPicked(i); grade(opt); }}
+                >
+                  {opt}
+                </ChoiceOption>
+              ))}
+            </div>
+          )}
+          {isMatching && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(item.payload.pairs ?? []).map((p) => (
+                <MatchingRow
+                  key={p.left}
+                  left={p.left}
+                  options={matchOptions}
+                  value={match[p.left] || ''}
+                  onChange={(e) => setMatch((m) => ({ ...m, [p.left]: e.target.value }))}
+                />
+              ))}
+              <Button variant="primary" size="lg" block onClick={submitMatch} disabled={pending || (item.payload.pairs ?? []).some((p) => !match[p.left])}>
+                Check
+              </Button>
+            </div>
+          )}
+          {!isChoice && !isMatching && (
+            <form onSubmit={(e) => { e.preventDefault(); grade(answer); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <Input placeholder="Type your answer…" value={answer} onChange={(e) => setAnswer(e.target.value)} autoFocus />
+              <Button variant="primary" size="lg" block type="submit" disabled={pending || !answer.trim()}>
+                {pending ? 'Checking…' : 'Check'}
+              </Button>
+            </form>
+          )}
+        </>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div
-            className={`animate-pop rounded-2xl px-5 py-4 text-center ring-1 ${VERDICT_STYLE[result.verdict]}`}
-          >
-            <p className="text-lg font-semibold">{VERDICT_LABEL[result.verdict]}</p>
-            <p className="mt-1 text-sm">
-              Answer: <span className="font-medium">{result.correctAnswer}</span>
-            </p>
-            <p className="mt-1 text-xs opacity-70">next review: {result.nextDueDate}</p>
-          </div>
-          <button
-            autoFocus
-            onClick={next}
-            className="rounded-2xl bg-slate-800 px-5 py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-slate-700 active:scale-[0.99]"
-          >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {isChoice && (
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {(item.payload.options ?? []).map((opt, i) => {
+                let state: 'default' | 'correct' | 'wrong' = 'default';
+                if (i === item.payload.correct_index) state = 'correct';
+                else if (i === picked) state = 'wrong';
+                return <ChoiceOption key={opt} state={state}>{opt}</ChoiceOption>;
+              })}
+            </div>
+          )}
+          {isMatching && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(item.payload.pairs ?? []).map((p) => (
+                <MatchingRow key={p.left} left={p.left} options={matchOptions} value={match[p.left] || ''} state={match[p.left] === p.right ? 'correct' : 'wrong'} />
+              ))}
+            </div>
+          )}
+          <VerdictBanner verdict={result.verdict} answer={result.correctAnswer} nextReview={result.nextDueDate} />
+          <Button variant={result.verdict === 'wrong' ? 'secondary' : 'primary'} size="lg" block onClick={next}>
             {index + 1 >= items.length ? 'Finish' : 'Next'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

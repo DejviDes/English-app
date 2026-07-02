@@ -1,12 +1,21 @@
 import BottomNav from '@/components/BottomNav';
 import SyncProvider from '@/components/SyncProvider';
 
-// Route group for gated app screens. Middleware enforces the gate.
+// Gated app shell: a centered mobile column, safe-area padding, and room for
+// the fixed bottom nav. Middleware enforces the gate.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="pb-16">
+    <div style={{ minHeight: '100dvh', background: 'var(--bg-app)' }}>
       <SyncProvider />
-      {children}
+      <div
+        className="lingua-app-column"
+        style={{
+          padding:
+            'calc(env(safe-area-inset-top) + 16px) var(--pad-screen) calc(88px + env(safe-area-inset-bottom))',
+        }}
+      >
+        {children}
+      </div>
       <BottomNav />
     </div>
   );
