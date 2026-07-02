@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getDashboard } from '@/lib/repos/dashboard';
+import InstallHint from '@/components/InstallHint';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto min-h-dvh max-w-md bg-slate-50 px-4 pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-10">
+      <InstallHint />
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">English</h1>
         <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-semibold text-orange-600 ring-1 ring-orange-200">

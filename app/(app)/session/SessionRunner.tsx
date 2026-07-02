@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { submitAttempt, type SubmitResult } from '@/app/actions/attempts';
 import MatchingInput, { type MatchPair } from '@/components/exercises/MatchingInput';
+import { evaluateAnswer } from '@/lib/eval/evaluate';
+import type { EvaluableExercise, ExerciseType } from '@/lib/eval/types';
+import { enqueue } from '@/lib/offline/outbox';
 
 export interface RunnerItem {
   exerciseId: string;
@@ -12,8 +15,29 @@ export interface RunnerItem {
     sentence?: string;
     hint?: string;
     options?: string[];
+    correct_index?: number;
     pairs?: MatchPair[];
+    correct_answer?: string;
+    acceptable_answers?: string[];
   };
+}
+
+function toEvaluable(item: RunnerItem): EvaluableExercise {
+  return {
+    type: item.type as ExerciseType,
+    correct_answer: item.payload.correct_answer ?? null,
+    acceptable_answers: item.payload.acceptable_answers ?? null,
+    payload: item.payload as EvaluableExercise['payload'],
+  };
+}
+
+function localReveal(item: RunnerItem): string {
+  const p = item.payload;
+  if (item.type === 'vocab_matching') return (p.pairs ?? []).map((pr) => `${pr.left} → ${pr.right}`).join(', ');
+  if (item.type === 'vocab_multiple_choice' || item.type === 'grammar_choose_option') {
+    return p.options?.[p.correct_index ?? -1] ?? p.correct_answer ?? '';
+  }
+  return p.correct_answer ?? '';
 }
 
 const PROMPT_LABEL: Record<string, string> = {
@@ -77,9 +101,31 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
   async function onSubmit(value: string) {
     if (pending || !value.trim()) return;
     setPending(true);
+    const attemptId = crypto.randomUUID();
     try {
-      const r = await submitAttempt(item.exerciseId, value);
+      const r = await submitAttempt(item.exerciseId, value, attemptId);
       setResult(r);
+    } catch {
+      // Offline or server error → evaluate locally and queue for later sync.
+      const local = evaluateAnswer(toEvaluable(item), value);
+      try {
+        await enqueue({
+          attemptId,
+          exerciseId: item.exerciseId,
+          userAnswer: value,
+          verdict: local.verdict,
+          reason: local.reason,
+          createdAt: new Date().toISOString(),
+        });
+      } catch {
+        /* IndexedDB unavailable — feedback is still shown */
+      }
+      setResult({
+        verdict: local.verdict,
+        reason: local.reason,
+        correctAnswer: localReveal(item),
+        nextDueDate: '— will sync',
+      });
     } finally {
       setPending(false);
     }

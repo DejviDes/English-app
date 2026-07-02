@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { createServerClient } from '@/lib/supabase/server';
 import { assertGate } from '@/lib/gate';
 import { evaluateAnswer } from '@/lib/eval/evaluate';
@@ -14,11 +15,7 @@ export interface SubmitResult {
 }
 
 /** Human-readable "correct answer" to reveal after submitting. */
-function revealAnswer(ex: {
-  type: string;
-  correct_answer: string | null;
-  payload: unknown;
-}): string {
+function revealAnswer(ex: { type: string; correct_answer: string | null; payload: unknown }): string {
   if (ex.type === 'vocab_matching') {
     const pairs = (ex.payload as MatchingPayload)?.pairs ?? [];
     return pairs.map((p) => `${p.left} → ${p.right}`).join(', ');
@@ -30,11 +27,14 @@ function revealAnswer(ex: {
   return ex.correct_answer ?? '';
 }
 
-export async function submitAttempt(exerciseId: string, userAnswer: string): Promise<SubmitResult> {
-  await assertGate();
+/** Core: evaluate → SM-2 → persist atomically. `attemptId` makes it idempotent. */
+async function persistAnswer(
+  attemptId: string,
+  exerciseId: string,
+  userAnswer: string,
+): Promise<SubmitResult> {
   const supabase = createServerClient();
 
-  // 1. Load exercise (only what evaluation + routing need).
   const { data: ex, error: exErr } = await supabase
     .from('exercises')
     .select('id,type,correct_answer,acceptable_answers,payload,primary_word_id,related_topic_id')
@@ -42,7 +42,6 @@ export async function submitAttempt(exerciseId: string, userAnswer: string): Pro
     .single();
   if (exErr || !ex) throw new Error('exercise_not_found');
 
-  // 2. Pure evaluation → verdict → SM-2 quality.
   const evaluable: EvaluableExercise = {
     type: ex.type,
     correct_answer: ex.correct_answer,
@@ -52,12 +51,10 @@ export async function submitAttempt(exerciseId: string, userAnswer: string): Pro
   const { verdict, reason } = evaluateAnswer(evaluable, userAnswer);
   const quality = verdictToQuality(verdict);
 
-  // 3. Resolve the single scheduling target (topic wins if set, else word).
   const target = ex.related_topic_id
     ? { table: 'grammar_topics' as const, id: ex.related_topic_id as string }
     : { table: 'words' as const, id: ex.primary_word_id as string };
 
-  // 4. Load current SM-2 state, compute the next state (pure), persist in one txn.
   const { data: item } = await supabase
     .from(target.table)
     .select('ease_factor,interval_days,repetitions')
@@ -67,6 +64,7 @@ export async function submitAttempt(exerciseId: string, userAnswer: string): Pro
   const next = updateSM2(state, quality, new Date());
 
   const { error: rpcErr } = await supabase.rpc('record_attempt', {
+    p_attempt_id: attemptId,
     p_exercise_id: ex.id,
     p_user_answer: userAnswer,
     p_verdict: verdict,
@@ -83,4 +81,37 @@ export async function submitAttempt(exerciseId: string, userAnswer: string): Pro
   if (rpcErr) throw rpcErr;
 
   return { verdict, reason, correctAnswer: revealAnswer(ex), nextDueDate: next.due_date };
+}
+
+/** Online submit (also used with a client-provided id so retries are idempotent). */
+export async function submitAttempt(
+  exerciseId: string,
+  userAnswer: string,
+  attemptId?: string,
+): Promise<SubmitResult> {
+  await assertGate();
+  return persistAnswer(attemptId ?? randomUUID(), exerciseId, userAnswer);
+}
+
+export interface QueuedAttempt {
+  attemptId: string;
+  exerciseId: string;
+  userAnswer: string;
+}
+
+/** Replay a batch of offline-queued attempts, in order. Idempotent per attemptId. */
+export async function flushAttempts(
+  items: QueuedAttempt[],
+): Promise<{ ok: boolean; synced: number; error?: string }> {
+  await assertGate();
+  let synced = 0;
+  try {
+    for (const it of items) {
+      await persistAnswer(it.attemptId, it.exerciseId, it.userAnswer);
+      synced++;
+    }
+    return { ok: true, synced };
+  } catch (e) {
+    return { ok: false, synced, error: e instanceof Error ? e.message : 'flush_failed' };
+  }
 }
