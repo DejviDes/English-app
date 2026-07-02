@@ -42,7 +42,8 @@ export default function ImportForm() {
           >
             <span>
               {report.skipped_duplicates ?? 0} duplicate(s) skipped
-              {report.unresolved ? `, ${report.unresolved} unresolved` : ''}.
+              {report.unresolved ? `, ${report.unresolved} unresolved` : ''}
+              {report.exercises_created != null ? `. ${report.exercises_created} exercise(s) auto-created` : ''}.
             </span>
           </InlineMessage>
         ) : (

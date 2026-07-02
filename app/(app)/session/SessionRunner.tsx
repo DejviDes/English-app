@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { submitAttempt, type SubmitResult } from '@/app/actions/attempts';
+import { saveQuizSession } from '@/app/actions/quiz';
+import { quizScore, type QuizCounts } from '@/lib/quiz';
 import { evaluateAnswer } from '@/lib/eval/evaluate';
 import type { EvaluableExercise, ExerciseType } from '@/lib/eval/types';
 import { enqueue } from '@/lib/offline/outbox';
@@ -38,6 +40,16 @@ const TYPE_LABEL: Record<string, string> = {
   grammar_fix_error: 'Fix error',
 };
 
+const footerStyle: React.CSSProperties = {
+  position: 'sticky',
+  bottom: 'calc(72px + env(safe-area-inset-bottom))',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  paddingTop: '14px',
+  background: 'linear-gradient(to top, var(--bg-app) 78%, transparent)',
+};
+
 function toEvaluable(item: RunnerItem): EvaluableExercise {
   return {
     type: item.type as ExerciseType,
@@ -62,6 +74,20 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
   const [match, setMatch] = useState<Record<string, string>>({});
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [pending, setPending] = useState(false);
+  const [counts, setCounts] = useState<QuizCounts>({ correct: 0, almost: 0, wrong: 0 });
+  const [saved, setSaved] = useState(false);
+
+  const answered = counts.correct + counts.almost + counts.wrong;
+  const finished = items.length > 0 && index >= items.length;
+
+  useEffect(() => {
+    if (finished && answered > 0 && !saved) {
+      // Save the quiz result exactly once when the run finishes.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSaved(true);
+      saveQuizSession(counts).catch(() => {});
+    }
+  }, [finished, answered, saved, counts]);
 
   if (items.length === 0) {
     return (
@@ -81,17 +107,30 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
     );
   }
 
-  if (index >= items.length) {
+  if (finished) {
+    const score = quizScore(counts);
+    const tone = score >= 80 ? 'correct' : score >= 50 ? 'almost' : 'wrong';
+    const emoji = score >= 80 ? '🎉' : score >= 50 ? '💪' : '📚';
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
         <Card padding="lg" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '44px' }}>🎉</div>
-          <h2 style={{ fontSize: 'var(--text-2xl)', marginTop: '8px' }}>Session complete</h2>
-          <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontSize: 'var(--text-sm)' }}>
-            You reviewed {items.length} item{items.length === 1 ? '' : 's'}. Nice work.
+          <div style={{ fontSize: '44px' }}>{emoji}</div>
+          <h2 style={{ fontSize: 'var(--text-2xl)', marginTop: '8px' }}>Quiz complete</h2>
+          <p style={{ fontSize: '56px', fontWeight: 'var(--fw-black)', color: 'var(--text-strong)', lineHeight: 1, marginTop: '10px' }}>{score}%</p>
+          <p style={{ color: 'var(--text-muted)', marginTop: '4px', fontSize: 'var(--text-sm)' }}>
+            {answered} question{answered === 1 ? '' : 's'} answered
           </p>
-          <div style={{ marginTop: '20px' }}>
+          <div style={{ marginTop: '16px' }}>
+            <ProgressBar value={score} max={100} tone={tone} height={12} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
+            <Badge tone="correct" size="sm">✓ {counts.correct}</Badge>
+            <Badge tone="almost" size="sm">✨ {counts.almost}</Badge>
+            <Badge tone="wrong" size="sm">✗ {counts.wrong}</Badge>
+          </div>
+          <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <Button variant="primary" size="lg" block onClick={() => router.push('/dashboard')}>Back to home</Button>
+            <Button variant="secondary" size="lg" block onClick={() => router.push('/session')}>New quiz</Button>
           </div>
         </Card>
       </div>
@@ -103,6 +142,7 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
   const isMatching = item.type === 'vocab_matching';
   const matchOptions = isMatching ? (item.payload.pairs ?? []).map((p) => p.right) : [];
   const promptText = isMatching ? 'Match each word to its Slovak meaning' : (item.payload.sentence ?? item.payload.prompt ?? '');
+  const matchIncomplete = isMatching && (item.payload.pairs ?? []).some((p) => !match[p.left]);
 
   function reset() {
     setAnswer('');
@@ -115,13 +155,15 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
     setIndex((i) => i + 1);
   }
 
-  async function grade(value: string) {
-    if (pending || !value.trim()) return;
+  async function grade(value: string, allowEmpty = false) {
+    if (pending) return;
+    if (!allowEmpty && !value.trim()) return;
     setPending(true);
     const attemptId = crypto.randomUUID();
     try {
       const r = await submitAttempt(item.exerciseId, value, attemptId);
       setResult(r);
+      setCounts((c) => ({ ...c, [r.verdict]: c[r.verdict] + 1 }));
     } catch {
       const local = evaluateAnswer(toEvaluable(item), value);
       try {
@@ -130,14 +172,17 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
         /* IndexedDB unavailable — feedback still shown */
       }
       setResult({ verdict: local.verdict, reason: local.reason, correctAnswer: localReveal(item), nextDueDate: '— will sync' });
+      setCounts((c) => ({ ...c, [local.verdict]: c[local.verdict] + 1 }));
     } finally {
       setPending(false);
     }
   }
 
-  function submitMatch() {
-    grade(JSON.stringify(match));
-  }
+  const revealButton = (
+    <Button variant="ghost" onClick={() => grade('', true)} disabled={pending} style={{ alignSelf: 'center' }}>
+      I don&apos;t know — show answer
+    </Button>
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -150,16 +195,13 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
 
       {promptText && <PromptCard prompt={promptText} hint={item.payload.hint} />}
 
+      {/* --- scrollable content --- */}
       {!result ? (
         <>
           {isChoice && (
             <div style={{ display: 'grid', gap: '10px' }}>
               {(item.payload.options ?? []).map((opt, i) => (
-                <ChoiceOption
-                  key={opt}
-                  state={picked === i ? 'selected' : 'default'}
-                  onClick={() => { setPicked(i); grade(opt); }}
-                >
+                <ChoiceOption key={opt} state={picked === i ? 'selected' : 'default'} onClick={() => { setPicked(i); grade(opt); }}>
                   {opt}
                 </ChoiceOption>
               ))}
@@ -168,25 +210,13 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
           {isMatching && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {(item.payload.pairs ?? []).map((p) => (
-                <MatchingRow
-                  key={p.left}
-                  left={p.left}
-                  options={matchOptions}
-                  value={match[p.left] || ''}
-                  onChange={(e) => setMatch((m) => ({ ...m, [p.left]: e.target.value }))}
-                />
+                <MatchingRow key={p.left} left={p.left} options={matchOptions} value={match[p.left] || ''} onChange={(e) => setMatch((m) => ({ ...m, [p.left]: e.target.value }))} />
               ))}
-              <Button variant="primary" size="lg" block onClick={submitMatch} disabled={pending || (item.payload.pairs ?? []).some((p) => !match[p.left])}>
-                Check
-              </Button>
             </div>
           )}
           {!isChoice && !isMatching && (
-            <form onSubmit={(e) => { e.preventDefault(); grade(answer); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form id="drill-form" onSubmit={(e) => { e.preventDefault(); grade(answer); }}>
               <Input placeholder="Type your answer…" value={answer} onChange={(e) => setAnswer(e.target.value)} autoFocus />
-              <Button variant="primary" size="lg" block type="submit" disabled={pending || !answer.trim()}>
-                {pending ? 'Checking…' : 'Check'}
-              </Button>
             </form>
           )}
         </>
@@ -210,11 +240,31 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
             </div>
           )}
           <VerdictBanner verdict={result.verdict} answer={result.correctAnswer} nextReview={result.nextDueDate} />
+        </div>
+      )}
+
+      {/* --- sticky action footer --- */}
+      <div style={footerStyle}>
+        {!result ? (
+          <>
+            {!isChoice && !isMatching && (
+              <Button variant="primary" size="lg" block type="submit" form="drill-form" disabled={pending || !answer.trim()}>
+                {pending ? 'Checking…' : 'Check'}
+              </Button>
+            )}
+            {isMatching && (
+              <Button variant="primary" size="lg" block onClick={() => grade(JSON.stringify(match))} disabled={pending || matchIncomplete}>
+                Check
+              </Button>
+            )}
+            {revealButton}
+          </>
+        ) : (
           <Button variant={result.verdict === 'wrong' ? 'secondary' : 'primary'} size="lg" block onClick={next}>
             {index + 1 >= items.length ? 'Finish' : 'Next'}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

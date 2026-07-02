@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-type IconKey = 'home' | 'drill' | 'add' | 'import' | 'export';
+type IconKey = 'home' | 'drill' | 'library' | 'add' | 'import' | 'export';
 
 const ICONS: Record<IconKey, React.ReactNode> = {
   home: <><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M9 21v-6h6v6" /></>,
   drill: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="0.6" fill="currentColor" /></>,
+  library: <><path d="m16 6 4 14" /><path d="M12 6v14" /><path d="M8 8v12" /><path d="M4 4v16" /></>,
   add: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
   import: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
   export: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>,
@@ -16,6 +17,7 @@ const ICONS: Record<IconKey, React.ReactNode> = {
 const ITEMS: { href: string; label: string; icon: IconKey }[] = [
   { href: '/dashboard', label: 'Home', icon: 'home' },
   { href: '/session', label: 'Drill', icon: 'drill' },
+  { href: '/library', label: 'Library', icon: 'library' },
   { href: '/add-word', label: 'Add', icon: 'add' },
   { href: '/import', label: 'Import', icon: 'import' },
   { href: '/export', label: 'Export', icon: 'export' },

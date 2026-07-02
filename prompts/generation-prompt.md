@@ -46,14 +46,21 @@ topics (name):
 
 ## Item shapes by kind
 
-### kind = "words"
+### kind = "words"  ← preferred for vocabulary
+
+**Importing a word auto-creates its drill questions** — EN→SK, SK→EN, and (if you give
+`options`) a multiple-choice question. So for vocabulary, generate **words**, NOT exercises.
 
 ```json
-{ "term": "leverage", "translation": "páka, vplyv", "part_of_speech": "noun",
-  "cefr_level": "B2", "example_sentence": "They used their position as leverage." }
+{ "term": "siblings", "translation": "súrodenci", "part_of_speech": "noun",
+  "cefr_level": "B1", "theme": "FAMILY",
+  "example_sentence": "My siblings are older than me.",
+  "options": ["súrodenci", "rodičia", "starí rodičia", "svokrovci"] }
 ```
-`part_of_speech` ∈ noun | verb | adjective | adverb | phrase | phrasal_verb | idiom | other.
-`example_sentence` optional. Optional `note`.
+- `part_of_speech` ∈ noun | verb | adjective | adverb | phrase | phrasal_verb | idiom | other.
+- `theme` (optional): the vocabulary category / "okruh" (e.g. FAMILY, TRAVEL) — used for grouping in the Library.
+- `options` (optional): 3–6 **distinct SK** choices that **must include the exact `translation`**. Drives the auto multiple-choice question. Omit for words you don't want an MC for.
+- `example_sentence`, `note` optional.
 
 ### kind = "grammar_topics"
 
@@ -64,6 +71,10 @@ topics (name):
 ```
 
 ### kind = "exercises"
+
+Use this mainly for **grammar** (fill-form / choose-option / fix-error) and special vocab
+drills (fill-in-blank sentences, matching sets). **Plain vocabulary should be `words`** —
+the app auto-creates EN→SK, SK→EN and MC from each word, so you don't hand-author those.
 
 Every exercise item has: `type`, `cefr_level`, a `payload` (shape depends on `type`), and a
 **target** — either `related_word_terms` (EN terms that must already exist as words) or

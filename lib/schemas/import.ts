@@ -116,6 +116,8 @@ export const wordItemSchema = z
     ]),
     cefr_level: cefr,
     example_sentence: nonEmpty.nullish(),
+    theme: nonEmpty.optional(), // vocabulary theme / "okruh" (e.g. FAMILY)
+    options: z.array(nonEmpty).min(2).max(8).optional(), // SK MC options → auto MC question
     note: z.string().trim().optional(),
   })
   .strict();

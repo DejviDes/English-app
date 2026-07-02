@@ -54,30 +54,65 @@ export function mergeBuckets(due: SrsRow[], fresh: SrsRow[], weak: SrsRow[], cap
   return out;
 }
 
-/** For each queued item, pick its least-used exercise (used ones may re-drill). */
+interface ExerciseRow {
+  id: string;
+  type: ExerciseType;
+  payload: unknown;
+  primary_word_id: string | null;
+  related_topic_id: string | null;
+  times_used: number | null;
+  last_used_at: string | null;
+}
+
+/** Least-used first, then least-recently-used (nulls first). */
+function leastUsed(a: ExerciseRow, b: ExerciseRow): number {
+  const tu = (a.times_used ?? 0) - (b.times_used ?? 0);
+  if (tu !== 0) return tu;
+  const at = a.last_used_at ?? '';
+  const bt = b.last_used_at ?? '';
+  return at < bt ? -1 : at > bt ? 1 : 0;
+}
+
+/**
+ * Attach one exercise per queued item. Single batched query for ALL items
+ * (was N+1 — one round-trip per item), then group + pick in memory.
+ */
 async function attachExercises(supabase: SupabaseClient, items: QueuedItem[]): Promise<SessionExercise[]> {
+  if (items.length === 0) return [];
+
+  const wordIds = items.filter((i) => i.kind === 'word').map((i) => i.itemId);
+  const topicIds = items.filter((i) => i.kind === 'topic').map((i) => i.itemId);
+
+  const orParts: string[] = [];
+  if (wordIds.length) orParts.push(`primary_word_id.in.(${wordIds.join(',')})`);
+  if (topicIds.length) orParts.push(`related_topic_id.in.(${topicIds.join(',')})`);
+  if (orParts.length === 0) return [];
+
+  const { data } = await supabase
+    .from('exercises')
+    .select('id,type,payload,primary_word_id,related_topic_id,times_used,last_used_at')
+    .or(orParts.join(','));
+
+  const byWord = new Map<string, ExerciseRow[]>();
+  const byTopic = new Map<string, ExerciseRow[]>();
+  for (const ex of (data as ExerciseRow[]) ?? []) {
+    if (ex.primary_word_id) {
+      const arr = byWord.get(ex.primary_word_id) ?? [];
+      arr.push(ex);
+      byWord.set(ex.primary_word_id, arr);
+    } else if (ex.related_topic_id) {
+      const arr = byTopic.get(ex.related_topic_id) ?? [];
+      arr.push(ex);
+      byTopic.set(ex.related_topic_id, arr);
+    }
+  }
+
   const out: SessionExercise[] = [];
   for (const it of items) {
-    let q = supabase
-      .from('exercises')
-      .select('id,type,payload')
-      .order('times_used', { ascending: true })
-      .order('last_used_at', { ascending: true, nullsFirst: true })
-      .limit(1);
-    q = it.kind === 'word' ? q.eq('primary_word_id', it.itemId) : q.eq('related_topic_id', it.itemId);
-    const { data } = await q;
-    const ex = data?.[0];
-    if (ex) {
-      out.push({
-        exerciseId: ex.id,
-        type: ex.type,
-        payload: ex.payload,
-        itemId: it.itemId,
-        kind: it.kind,
-        bucket: it.bucket,
-      });
-    }
-    // else: item has no exercise yet → dropped (dashboard surfaces the gap).
+    const pool = it.kind === 'word' ? byWord.get(it.itemId) : byTopic.get(it.itemId);
+    if (!pool || pool.length === 0) continue; // no exercise yet → dropped
+    const ex = [...pool].sort(leastUsed)[0];
+    out.push({ exerciseId: ex.id, type: ex.type, payload: ex.payload, itemId: it.itemId, kind: it.kind, bucket: it.bucket });
   }
   return out;
 }
