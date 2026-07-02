@@ -5,24 +5,43 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppHeader, Badge, StartCard, Stat } from '@/components/ui/primitives';
 import { InlineMessage } from '@/components/ui/feedback';
+import { Select } from '@/components/ui/forms';
 import InstallHint from '@/components/InstallHint';
 import type { DashboardStats } from '@/lib/repos/dashboard';
 
 const SIZES = [10, 15, 20, 25];
 
+const QTYPES = [
+  { value: 'mix', label: 'Mix (all types)' },
+  { value: 'vocab_multiple_choice', label: 'Multiple choice — easiest' },
+  { value: 'vocab_en_sk', label: 'EN → SK (type the answer)' },
+  { value: 'vocab_sk_en', label: 'SK → EN (type the answer)' },
+];
+
 export default function DashboardView({ stats }: { stats: DashboardStats }) {
   const router = useRouter();
   const [size, setSize] = useState(15);
+  const [qtype, setQtype] = useState('mix');
 
+  /* eslint-disable react-hooks/set-state-in-effect -- one-time, hydration-safe load of saved prefs */
   useEffect(() => {
     const s = Number(localStorage.getItem('quiz-size'));
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    const t = localStorage.getItem('quiz-type');
     if (SIZES.includes(s)) setSize(s);
+    if (t && QTYPES.some((o) => o.value === t)) setQtype(t);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  function pick(n: number) {
+  function pickSize(n: number) {
     setSize(n);
     localStorage.setItem('quiz-size', String(n));
+  }
+  function pickType(t: string) {
+    setQtype(t);
+    localStorage.setItem('quiz-type', t);
+  }
+  function start() {
+    router.push(`/session?n=${size}${qtype !== 'mix' ? `&type=${qtype}` : ''}`);
   }
 
   const nothing = stats.totalExercises === 0;
@@ -47,7 +66,7 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
         due={stats.toReview}
         newItems={stats.newItems}
         subtitle={`${size}-question quiz`}
-        onClick={() => router.push(`/session?n=${size}`)}
+        onClick={start}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -59,7 +78,7 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
               <button
                 key={n}
                 type="button"
-                onClick={() => pick(n)}
+                onClick={() => pickSize(n)}
                 style={{
                   flex: 1, border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-md)', padding: '12px 0',
                   fontSize: 'var(--text-base)', fontWeight: 'var(--fw-bold)',
@@ -75,6 +94,11 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
             );
           })}
         </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--fw-bold)', color: 'var(--text-muted)' }}>Question type</p>
+        <Select options={QTYPES} value={qtype} onChange={(e) => pickType(e.target.value)} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>

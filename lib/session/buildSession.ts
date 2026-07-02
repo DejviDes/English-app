@@ -77,7 +77,11 @@ function leastUsed(a: ExerciseRow, b: ExerciseRow): number {
  * Attach one exercise per queued item. Single batched query for ALL items
  * (was N+1 — one round-trip per item), then group + pick in memory.
  */
-async function attachExercises(supabase: SupabaseClient, items: QueuedItem[]): Promise<SessionExercise[]> {
+async function attachExercises(
+  supabase: SupabaseClient,
+  items: QueuedItem[],
+  type?: string,
+): Promise<SessionExercise[]> {
   if (items.length === 0) return [];
 
   const wordIds = items.filter((i) => i.kind === 'word').map((i) => i.itemId);
@@ -88,10 +92,12 @@ async function attachExercises(supabase: SupabaseClient, items: QueuedItem[]): P
   if (topicIds.length) orParts.push(`related_topic_id.in.(${topicIds.join(',')})`);
   if (orParts.length === 0) return [];
 
-  const { data } = await supabase
+  let query = supabase
     .from('exercises')
     .select('id,type,payload,primary_word_id,related_topic_id,times_used,last_used_at')
     .or(orParts.join(','));
+  if (type) query = query.eq('type', type);
+  const { data } = await query;
 
   const byWord = new Map<string, ExerciseRow[]>();
   const byTopic = new Map<string, ExerciseRow[]>();
@@ -118,9 +124,15 @@ async function attachExercises(supabase: SupabaseClient, items: QueuedItem[]): P
 }
 
 /** Build the deterministic session queue (due + new + weak → one exercise each). */
-export async function buildSession(cap: number = SESSION_SIZE): Promise<SessionExercise[]> {
+export async function buildSession(
+  cap: number = SESSION_SIZE,
+  type?: string,
+): Promise<SessionExercise[]> {
   const supabase = createServerClient();
   const today = toISODate(new Date());
+  // Over-fetch candidate items so a type-filtered quiz still fills to `cap`
+  // (some items may lack an exercise of the chosen type).
+  const fetchLimit = Math.min(cap * 4, 200);
 
   const [dueQ, newQ, weakQ] = await Promise.all([
     supabase
@@ -131,14 +143,14 @@ export async function buildSession(cap: number = SESSION_SIZE): Promise<SessionE
       .order('due_date', { ascending: true })
       .order('last_reviewed', { ascending: true })
       .order('kind', { ascending: true })
-      .limit(cap),
+      .limit(fetchLimit),
     supabase
       .from('srs_items')
       .select(SELECT)
       .is('last_reviewed', null)
       .order('created_at', { ascending: true })
       .order('kind', { ascending: true })
-      .limit(cap),
+      .limit(fetchLimit),
     supabase
       .from('srs_items')
       .select(SELECT)
@@ -146,14 +158,15 @@ export async function buildSession(cap: number = SESSION_SIZE): Promise<SessionE
       .lt('ease_factor', 2.0)
       .gt('due_date', today)
       .order('ease_factor', { ascending: true })
-      .limit(cap),
+      .limit(fetchLimit),
   ]);
 
   const items = mergeBuckets(
     (dueQ.data as SrsRow[]) ?? [],
     (newQ.data as SrsRow[]) ?? [],
     (weakQ.data as SrsRow[]) ?? [],
-    cap,
+    fetchLimit,
   );
-  return attachExercises(supabase, items);
+  const withExercises = await attachExercises(supabase, items, type);
+  return withExercises.slice(0, cap);
 }

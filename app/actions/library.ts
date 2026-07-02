@@ -34,6 +34,7 @@ export async function getLibraryPage(
       { count: 'exact' },
     )
     .order('imported_at', { ascending: false })
+    .order('id', { ascending: true }) // stable tiebreaker → no overlap across pages
     .range(filters.offset, filters.offset + LIBRARY_PAGE - 1);
 
   if (filters.status === 'done') q = q.gt('times_used', 0);

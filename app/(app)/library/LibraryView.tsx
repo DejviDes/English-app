@@ -115,7 +115,10 @@ export default function LibraryView({
   async function loadMore() {
     setLoading(true);
     const res = await getLibraryPage({ status, type, offset: rows.length });
-    setRows((r) => [...r, ...res.rows]);
+    setRows((r) => {
+      const seen = new Set(r.map((x) => x.id));
+      return [...r, ...res.rows.filter((x) => !seen.has(x.id))];
+    });
     setTotal(res.total);
     setLoading(false);
   }
