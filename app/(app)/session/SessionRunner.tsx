@@ -59,6 +59,14 @@ function toEvaluable(item: RunnerItem): EvaluableExercise {
   };
 }
 
+/** Bilingual feedback props from a vocab item; falls back to a single answer. */
+function bilingualProps(item: RunnerItem, correct: string): { en?: string; sk?: string; answer?: string } {
+  const p = item.payload;
+  if (item.type === 'vocab_en_sk' || item.type === 'vocab_multiple_choice') return { en: p.prompt, sk: correct };
+  if (item.type === 'vocab_sk_en') return { en: correct, sk: p.prompt };
+  return { answer: correct };
+}
+
 function localReveal(item: RunnerItem): string {
   const p = item.payload;
   if (item.type === 'vocab_matching') return (p.pairs ?? []).map((pr) => `${pr.left} → ${pr.right}`).join(', ');
@@ -239,7 +247,7 @@ export default function SessionRunner({ items }: { items: RunnerItem[] }) {
               ))}
             </div>
           )}
-          <VerdictBanner verdict={result.verdict} answer={result.correctAnswer} nextReview={result.nextDueDate} />
+          <VerdictBanner verdict={result.verdict} {...bilingualProps(item, result.correctAnswer)} nextReview={result.nextDueDate} />
         </div>
       )}
 

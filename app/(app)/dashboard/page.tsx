@@ -1,9 +1,9 @@
-import { getDashboard } from '@/lib/repos/dashboard';
-import DashboardView from './DashboardView';
+import { getHeaderStats, getJourney } from '@/lib/repos/journey';
+import JourneyMap from './JourneyMap';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const stats = await getDashboard();
-  return <DashboardView stats={stats} />;
+  const [journey, header] = await Promise.all([getJourney(), getHeaderStats()]);
+  return <JourneyMap journey={journey} header={header} />;
 }

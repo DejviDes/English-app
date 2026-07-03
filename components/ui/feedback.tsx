@@ -45,7 +45,23 @@ export function ProgressBar({ value = 0, max = 100, tone = 'primary', height = 1
 /* ---------------- VerdictBanner ---------------- */
 type Verdict = 'correct' | 'almost' | 'wrong';
 
-export function VerdictBanner({ verdict = 'correct', answer, explanation, nextReview, style }: { verdict?: Verdict; answer?: React.ReactNode; explanation?: React.ReactNode; nextReview?: React.ReactNode; style?: React.CSSProperties }) {
+export function VerdictBanner({
+  verdict = 'correct',
+  answer,
+  explanation,
+  nextReview,
+  en,
+  sk,
+  style,
+}: {
+  verdict?: Verdict;
+  answer?: React.ReactNode;
+  explanation?: React.ReactNode;
+  nextReview?: React.ReactNode;
+  en?: string;
+  sk?: string;
+  style?: React.CSSProperties;
+}) {
   const config: Record<Verdict, { bg: string; fg: string; ring: string; solid: string; label: string; emoji: string; icon: React.ReactNode }> = {
     correct: { bg: 'var(--correct-bg)', fg: 'var(--correct-fg)', ring: 'var(--correct-ring)', solid: 'var(--correct-solid)', label: 'Correct', emoji: '🎉', icon: <path d="M20 6 9 17l-5-5" /> },
     almost: { bg: 'var(--almost-bg)', fg: 'var(--almost-fg)', ring: 'var(--almost-ring)', solid: 'var(--almost-solid)', label: 'Almost', emoji: '✨', icon: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" /></> },
@@ -60,7 +76,26 @@ export function VerdictBanner({ verdict = 'correct', answer, explanation, nextRe
         </span>
         <span style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--fw-extrabold)' }}>{c.label}{c.emoji ? ` ${c.emoji}` : ''}</span>
       </div>
-      {answer != null && <p style={{ fontSize: 'var(--text-base)' }}>Answer: <span style={{ fontWeight: 'var(--fw-bold)' }}>{answer}</span></p>}
+      {en || sk ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {en && (
+            <p style={{ fontSize: 'var(--text-base)' }}>
+              🇬🇧 <span style={{ fontWeight: 'var(--fw-bold)' }}>{en}</span>
+            </p>
+          )}
+          {sk && (
+            <p style={{ fontSize: 'var(--text-base)' }}>
+              🇸🇰 <span style={{ fontWeight: 'var(--fw-bold)' }}>{sk}</span>
+            </p>
+          )}
+        </div>
+      ) : (
+        answer != null && (
+          <p style={{ fontSize: 'var(--text-base)' }}>
+            Answer: <span style={{ fontWeight: 'var(--fw-bold)' }}>{answer}</span>
+          </p>
+        )
+      )}
       {explanation && <p style={{ fontSize: 'var(--text-sm)', opacity: 0.85, lineHeight: 'var(--leading-snug)' }}>{explanation}</p>}
       {nextReview && <p style={{ fontSize: 'var(--text-xs)', opacity: 0.7 }}>next review: {nextReview}</p>}
     </div>

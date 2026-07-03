@@ -4,7 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import { AppHeader, Badge, Button, Card } from '@/components/ui/primitives';
 import { Input } from '@/components/ui/forms';
 import { searchWords } from '@/app/actions/dictionary';
-import type { DictRow } from '@/lib/dictionary';
+import type { DictRow, WordStatus } from '@/lib/dictionary';
+
+const STATUS: Record<WordStatus, { tone: 'neutral' | 'almost' | 'primary' | 'correct'; label: string }> = {
+  new: { tone: 'neutral', label: 'New' },
+  learning: { tone: 'almost', label: 'Learning' },
+  daily: { tone: 'primary', label: 'Day ✓' },
+  review: { tone: 'correct', label: 'Reviewed' },
+  weekly: { tone: 'correct', label: 'Weekly 🏆' },
+};
 
 const SearchIcon = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -22,8 +30,8 @@ function WordRow({ r }: { r: DictRow }) {
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>{r.translation}</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-          {r.cefr && <Badge tone="primary" size="sm">{r.cefr}</Badge>}
-          {r.theme && <Badge tone="neutral" size="sm">{r.theme}</Badge>}
+          <Badge tone={STATUS[r.status].tone} size="sm">{STATUS[r.status].label}</Badge>
+          {r.cefr && <Badge tone="neutral" size="sm">{r.cefr}</Badge>}
         </div>
       </div>
     </Card>

@@ -2,11 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { AppHeader, Badge, StartCard, Stat } from '@/components/ui/primitives';
-import { InlineMessage } from '@/components/ui/feedback';
+import { AppHeader, Badge, Button } from '@/components/ui/primitives';
 import { Select } from '@/components/ui/forms';
-import InstallHint from '@/components/InstallHint';
 import type { DashboardStats } from '@/lib/repos/dashboard';
 
 const SIZES = [10, 15, 20, 25];
@@ -21,23 +18,14 @@ const TYPE_LABEL: Record<string, string> = {
   grammar_choose_option: 'Grammar: choose option',
   grammar_fix_error: 'Grammar: fix the error',
 };
-const TYPE_ORDER = [
-  'vocab_multiple_choice',
-  'vocab_en_sk',
-  'vocab_sk_en',
-  'vocab_fill_blank',
-  'vocab_matching',
-  'grammar_fill_form',
-  'grammar_choose_option',
-  'grammar_fix_error',
-];
+const TYPE_ORDER = Object.keys(TYPE_LABEL);
 
-export default function DashboardView({ stats }: { stats: DashboardStats }) {
+export default function SessionStart({ stats }: { stats: DashboardStats }) {
   const router = useRouter();
   const [size, setSize] = useState(15);
   const [qtype, setQtype] = useState('mix');
 
-  /* eslint-disable react-hooks/set-state-in-effect -- one-time, hydration-safe load of saved prefs */
+  /* eslint-disable react-hooks/set-state-in-effect -- one-time load of saved prefs */
   useEffect(() => {
     const s = Number(localStorage.getItem('quiz-size'));
     const t = localStorage.getItem('quiz-type');
@@ -58,37 +46,23 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
     router.push(`/session?n=${size}${qtype !== 'mix' ? `&type=${qtype}` : ''}`);
   }
 
-  const nothing = stats.totalExercises === 0;
   const typeCounts = stats.typeCounts ?? {};
   const qtypeOptions = [
     { value: 'mix', label: 'Mix (all types)' },
-    ...TYPE_ORDER.filter((t) => typeCounts[t]).map((t) => ({
-      value: t,
-      label: `${TYPE_LABEL[t]} — ${typeCounts[t]}`,
-    })),
+    ...TYPE_ORDER.filter((t) => typeCounts[t]).map((t) => ({ value: t, label: `${TYPE_LABEL[t]} — ${typeCounts[t]}` })),
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-section)' }}>
-      <InstallHint />
-
       <AppHeader
-        title="English"
+        title="Free practice"
+        subtitle="A quick quiz on your words"
         right={
           <div style={{ display: 'flex', gap: '6px' }}>
-            {stats.lastScore != null && (
-              <Badge tone="primary" icon={<span>🎯</span>}>{stats.lastScore}%</Badge>
-            )}
+            {stats.lastScore != null && <Badge tone="primary" icon={<span>🎯</span>}>{stats.lastScore}%</Badge>}
             <Badge tone="streak" icon={<span>🔥</span>}>{stats.streak}</Badge>
           </div>
         }
-      />
-
-      <StartCard
-        due={stats.toReview}
-        newItems={stats.newItems}
-        subtitle={`${size}-question quiz`}
-        onClick={start}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -108,7 +82,6 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
                   color: on ? '#fff' : 'var(--text-body)',
                   boxShadow: on ? 'var(--shadow-primary)' : 'var(--shadow-sm)',
                   outline: on ? 'none' : '1px solid var(--border-subtle)', outlineOffset: '-1px',
-                  transition: 'background var(--dur-fast) var(--ease-out)',
                 }}
               >
                 {n}
@@ -123,33 +96,7 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
         <Select options={qtypeOptions} value={qtype} onChange={(e) => pickType(e.target.value)} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
-        <Stat value={stats.totalWords} label="Words" />
-        <Stat value={stats.totalTopics} label="Topics" />
-        <Stat value={stats.totalExercises} label="Exercises" />
-      </div>
-
-      {nothing ? (
-        <InlineMessage tone="info" title="No content yet" icon={<span style={{ fontSize: '18px' }}>📦</span>}>
-          <span>
-            Generate a batch in a Claude chat, then{' '}
-            <Link href="/import" style={{ fontWeight: 'var(--fw-bold)', textDecoration: 'underline' }}>import</Link> it.
-          </span>
-        </InlineMessage>
-      ) : (
-        stats.dueWithoutExercise > 0 && (
-          <InlineMessage
-            tone="warning"
-            title={`${stats.dueWithoutExercise} due item(s) have no exercises.`}
-            icon={<span style={{ fontSize: '18px' }}>💡</span>}
-          >
-            <span>
-              Generate a batch (see the generation prompt) and{' '}
-              <Link href="/import" style={{ fontWeight: 'var(--fw-bold)', textDecoration: 'underline' }}>import</Link> it.
-            </span>
-          </InlineMessage>
-        )
-      )}
+      <Button variant="primary" size="lg" block onClick={start}>Start quiz</Button>
     </div>
   );
 }

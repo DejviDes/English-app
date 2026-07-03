@@ -181,8 +181,14 @@ a { color: var(--primary); text-decoration: none; }
 }
 @keyframes lingua-spin { to { transform: rotate(360deg); } }
 
+@keyframes lingua-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(30, 181, 103, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(30, 181, 103, 0); }
+}
+
 .lingua-animate-pop { animation: lingua-pop var(--dur-slow) var(--ease-spring); }
 .lingua-animate-up { animation: lingua-fade-up var(--dur-base) var(--ease-out); }
+.lingua-pulse { animation: lingua-pulse 1.9s var(--ease-in-out) infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .lingua-animate-pop,
