@@ -11,11 +11,25 @@ import type { DashboardStats } from '@/lib/repos/dashboard';
 
 const SIZES = [10, 15, 20, 25];
 
-const QTYPES = [
-  { value: 'mix', label: 'Mix (all types)' },
-  { value: 'vocab_multiple_choice', label: 'Multiple choice — easiest' },
-  { value: 'vocab_en_sk', label: 'EN → SK (type the answer)' },
-  { value: 'vocab_sk_en', label: 'SK → EN (type the answer)' },
+const TYPE_LABEL: Record<string, string> = {
+  vocab_multiple_choice: 'Multiple choice (easiest)',
+  vocab_en_sk: 'EN → SK (type the answer)',
+  vocab_sk_en: 'SK → EN (type the answer)',
+  vocab_fill_blank: 'Fill in the blank',
+  vocab_matching: 'Matching',
+  grammar_fill_form: 'Grammar: verb form',
+  grammar_choose_option: 'Grammar: choose option',
+  grammar_fix_error: 'Grammar: fix the error',
+};
+const TYPE_ORDER = [
+  'vocab_multiple_choice',
+  'vocab_en_sk',
+  'vocab_sk_en',
+  'vocab_fill_blank',
+  'vocab_matching',
+  'grammar_fill_form',
+  'grammar_choose_option',
+  'grammar_fix_error',
 ];
 
 export default function DashboardView({ stats }: { stats: DashboardStats }) {
@@ -28,7 +42,7 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
     const s = Number(localStorage.getItem('quiz-size'));
     const t = localStorage.getItem('quiz-type');
     if (SIZES.includes(s)) setSize(s);
-    if (t && QTYPES.some((o) => o.value === t)) setQtype(t);
+    if (t && (t === 'mix' || t in TYPE_LABEL)) setQtype(t);
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -45,6 +59,13 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
   }
 
   const nothing = stats.totalExercises === 0;
+  const qtypeOptions = [
+    { value: 'mix', label: 'Mix (all types)' },
+    ...TYPE_ORDER.filter((t) => stats.typeCounts[t]).map((t) => ({
+      value: t,
+      label: `${TYPE_LABEL[t]} — ${stats.typeCounts[t]}`,
+    })),
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-section)' }}>
@@ -98,7 +119,7 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--fw-bold)', color: 'var(--text-muted)' }}>Question type</p>
-        <Select options={QTYPES} value={qtype} onChange={(e) => pickType(e.target.value)} />
+        <Select options={qtypeOptions} value={qtype} onChange={(e) => pickType(e.target.value)} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>

@@ -12,7 +12,19 @@ export interface DashboardStats {
   dueWithoutExercise: number;
   streak: number;
   lastScore: number | null;
+  typeCounts: Record<string, number>;
 }
+
+export const EXERCISE_TYPES = [
+  'vocab_en_sk',
+  'vocab_sk_en',
+  'vocab_fill_blank',
+  'vocab_multiple_choice',
+  'vocab_matching',
+  'grammar_fill_form',
+  'grammar_choose_option',
+  'grammar_fix_error',
+] as const;
 
 export async function getDashboard(): Promise<DashboardStats> {
   const supabase = createServerClient();
@@ -22,19 +34,39 @@ export async function getDashboard(): Promise<DashboardStats> {
   since.setDate(since.getDate() - 400);
 
   // All independent — fire in one round-trip wave.
-  const [wordsC, topicsC, exC, toReviewC, newC, dueItemsR, exWordsR, exTopicsR, attemptsR, quizR] =
-    await Promise.all([
-      supabase.from('words').select('*', { count: 'exact', head: true }),
-      supabase.from('grammar_topics').select('*', { count: 'exact', head: true }),
-      supabase.from('exercises').select('*', { count: 'exact', head: true }),
-      supabase.from('srs_items').select('*', { count: 'exact', head: true }).lte('due_date', today),
-      supabase.from('srs_items').select('*', { count: 'exact', head: true }).is('last_reviewed', null),
-      supabase.from('srs_items').select('id,kind').lte('due_date', today),
-      supabase.from('exercises').select('primary_word_id').not('primary_word_id', 'is', null),
-      supabase.from('exercises').select('related_topic_id').not('related_topic_id', 'is', null),
-      supabase.from('attempts').select('created_at').gte('created_at', since.toISOString()),
-      supabase.from('quiz_sessions').select('score_pct').order('created_at', { ascending: false }).limit(1),
-    ]);
+  const [
+    wordsC,
+    topicsC,
+    exC,
+    toReviewC,
+    newC,
+    dueItemsR,
+    exWordsR,
+    exTopicsR,
+    attemptsR,
+    quizR,
+    ...typeCs
+  ] = await Promise.all([
+    supabase.from('words').select('*', { count: 'exact', head: true }),
+    supabase.from('grammar_topics').select('*', { count: 'exact', head: true }),
+    supabase.from('exercises').select('*', { count: 'exact', head: true }),
+    supabase.from('srs_items').select('*', { count: 'exact', head: true }).lte('due_date', today),
+    supabase.from('srs_items').select('*', { count: 'exact', head: true }).is('last_reviewed', null),
+    supabase.from('srs_items').select('id,kind').lte('due_date', today),
+    supabase.from('exercises').select('primary_word_id').not('primary_word_id', 'is', null),
+    supabase.from('exercises').select('related_topic_id').not('related_topic_id', 'is', null),
+    supabase.from('attempts').select('created_at').gte('created_at', since.toISOString()),
+    supabase.from('quiz_sessions').select('score_pct').order('created_at', { ascending: false }).limit(1),
+    ...EXERCISE_TYPES.map((t) =>
+      supabase.from('exercises').select('*', { count: 'exact', head: true }).eq('type', t),
+    ),
+  ]);
+
+  const typeCounts: Record<string, number> = {};
+  EXERCISE_TYPES.forEach((t, i) => {
+    const c = typeCs[i]?.count ?? 0;
+    if (c > 0) typeCounts[t] = c;
+  });
 
   // Due items lacking any exercise → the cue to import a batch.
   const wordSet = new Set((exWordsR.data ?? []).map((e) => e.primary_word_id as string));
@@ -55,5 +87,6 @@ export async function getDashboard(): Promise<DashboardStats> {
     dueWithoutExercise,
     streak,
     lastScore: (quizR.data?.[0]?.score_pct as number | undefined) ?? null,
+    typeCounts,
   };
 }

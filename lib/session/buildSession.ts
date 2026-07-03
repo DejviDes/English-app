@@ -64,6 +64,15 @@ interface ExerciseRow {
   last_used_at: string | null;
 }
 
+/** Fisher–Yates shuffle (for random tie-breaking so Mix varies exercise types). */
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 /** Least-used first, then least-recently-used (nulls first). */
 function leastUsed(a: ExerciseRow, b: ExerciseRow): number {
   const tu = (a.times_used ?? 0) - (b.times_used ?? 0);
@@ -117,7 +126,9 @@ async function attachExercises(
   for (const it of items) {
     const pool = it.kind === 'word' ? byWord.get(it.itemId) : byTopic.get(it.itemId);
     if (!pool || pool.length === 0) continue; // no exercise yet → dropped
-    const ex = [...pool].sort(leastUsed)[0];
+    // Shuffle first so equally-used exercises (e.g. all-new) are picked at random,
+    // giving Mix a real spread of types instead of always the first one.
+    const ex = shuffle([...pool]).sort(leastUsed)[0];
     out.push({ exerciseId: ex.id, type: ex.type, payload: ex.payload, itemId: it.itemId, kind: it.kind, bucket: it.bucket });
   }
   return out;

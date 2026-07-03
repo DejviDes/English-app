@@ -3,7 +3,16 @@ import SessionRunner, { type RunnerItem } from './SessionRunner';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_TYPES = ['vocab_multiple_choice', 'vocab_en_sk', 'vocab_sk_en'];
+const ALLOWED_TYPES = [
+  'vocab_en_sk',
+  'vocab_sk_en',
+  'vocab_fill_blank',
+  'vocab_multiple_choice',
+  'vocab_matching',
+  'grammar_fill_form',
+  'grammar_choose_option',
+  'grammar_fix_error',
+];
 
 export default async function SessionPage({
   searchParams,
