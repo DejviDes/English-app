@@ -59,11 +59,12 @@ export default function DashboardView({ stats }: { stats: DashboardStats }) {
   }
 
   const nothing = stats.totalExercises === 0;
+  const typeCounts = stats.typeCounts ?? {};
   const qtypeOptions = [
     { value: 'mix', label: 'Mix (all types)' },
-    ...TYPE_ORDER.filter((t) => stats.typeCounts[t]).map((t) => ({
+    ...TYPE_ORDER.filter((t) => typeCounts[t]).map((t) => ({
       value: t,
-      label: `${TYPE_LABEL[t]} — ${stats.typeCounts[t]}`,
+      label: `${TYPE_LABEL[t]} — ${typeCounts[t]}`,
     })),
   ];
 

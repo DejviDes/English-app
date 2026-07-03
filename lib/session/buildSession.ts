@@ -172,9 +172,11 @@ export async function buildSession(
       .limit(fetchLimit),
   ]);
 
+  // Due items stay priority-ordered; NEW items are shuffled so each quiz draws a
+  // varied set of words (and therefore a varied mix of exercise types).
   const items = mergeBuckets(
     (dueQ.data as SrsRow[]) ?? [],
-    (newQ.data as SrsRow[]) ?? [],
+    shuffle([...((newQ.data as SrsRow[]) ?? [])]),
     (weakQ.data as SrsRow[]) ?? [],
     fetchLimit,
   );
