@@ -40,9 +40,8 @@ export function materializeWordExercises(word: MaterializableWord): Materialized
       content_hash: exerciseContentHash(type, correct, payload),
     });
 
-  push('vocab_en_sk', { prompt: term, prompt_lang: 'en', answer_lang: 'sk', correct_answer: translation }, translation);
-  push('vocab_sk_en', { prompt: translation, prompt_lang: 'sk', answer_lang: 'en', correct_answer: term }, term);
-
+  // Only a multiple-choice question is auto-created (typed EN↔SK drills were removed —
+  // slow/imprecise to type; vocabulary is learned via the flashcard levels instead).
   // Multiple choice from options — needs distinct options incl. the correct one.
   let opts = [...new Set((word.options ?? []).map((o) => o.trim()).filter(Boolean))];
   if (opts.length > 6) {

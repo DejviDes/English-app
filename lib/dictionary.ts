@@ -1,6 +1,6 @@
 export const DICT_PAGE = 50;
 
-export type WordStatus = 'new' | 'learning' | 'daily' | 'review' | 'weekly';
+export type WordStatus = 'new' | 'learning' | 'known';
 
 export interface DictRow {
   id: string;

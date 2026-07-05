@@ -1,9 +1,9 @@
 import { getVocabLevels } from '@/lib/repos/levels';
-import LibraryView from './LibraryView';
+import LevelsMap from './LevelsMap';
 
 export const dynamic = 'force-dynamic';
 
-export default async function LibraryPage() {
+export default async function VocabularyPage() {
   const data = await getVocabLevels();
-  return <LibraryView data={data} />;
+  return <LevelsMap data={data} />;
 }

@@ -48,8 +48,9 @@ topics (name):
 
 ### kind = "words"  ← preferred for vocabulary
 
-**Importing a word auto-creates its drill questions** — EN→SK, SK→EN, and (if you give
-`options`) a multiple-choice question. So for vocabulary, generate **words**, NOT exercises.
+Vocabulary is learned via the flashcard **levels** (built from the words themselves). Importing
+a word also auto-creates a **multiple-choice** question when you give `options` (used by the free
+Drill quiz). So for vocabulary, generate **words**, NOT exercises.
 
 ```json
 { "term": "siblings", "translation": "súrodenci", "part_of_speech": "noun",

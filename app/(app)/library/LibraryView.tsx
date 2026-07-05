@@ -1,38 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { AppHeader, Badge, Button, Card, Stat } from '@/components/ui/primitives';
-import { Select } from '@/components/ui/forms';
-import { getLibraryPage } from '@/app/actions/library';
-import type { LibraryFilters, LibraryRow, LibrarySummary } from '@/lib/repos/library';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { AppHeader, Badge, Card } from '@/components/ui/primitives';
+import type { LevelNode, VocabLevels } from '@/lib/repos/levels';
 
-const TYPE_LABEL: Record<string, string> = {
-  vocab_en_sk: 'EN → SK',
-  vocab_sk_en: 'SK → EN',
-  vocab_fill_blank: 'Fill blank',
-  vocab_multiple_choice: 'Choose',
-  vocab_matching: 'Match',
-  grammar_fill_form: 'Verb form',
-  grammar_choose_option: 'Grammar',
-  grammar_fix_error: 'Fix error',
-};
+function prettyTheme(t: string | null): string {
+  if (!t) return 'General';
+  return t.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+}
 
-const TYPE_OPTIONS = [
-  { value: 'all', label: 'All types' },
-  ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label })),
-];
+type Filter = 'all' | 'done' | 'todo';
 
-type Status = LibraryFilters['status'];
-
-function Segmented({ value, onChange }: { value: Status; onChange: (v: Status) => void }) {
-  const opts: { id: Status; label: string }[] = [
+function FilterTabs({ value, onChange }: { value: Filter; onChange: (v: Filter) => void }) {
+  const tabs: { id: Filter; label: string }[] = [
     { id: 'all', label: 'All' },
     { id: 'todo', label: 'To-do' },
     { id: 'done', label: 'Done' },
   ];
   return (
     <div style={{ display: 'flex', gap: '4px', padding: '4px', background: 'var(--surface-inset)', borderRadius: 'var(--radius-pill)' }}>
-      {opts.map((o) => {
+      {tabs.map((o) => {
         const on = value === o.id;
         return (
           <button
@@ -55,108 +43,67 @@ function Segmented({ value, onChange }: { value: Status; onChange: (v: Status) =
   );
 }
 
-function Row({ r }: { r: LibraryRow }) {
+function LevelCard({ l }: { l: LevelNode }) {
+  const done = l.status === 'done';
   return (
-    <Card padding="sm">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          <Badge tone="primary" size="sm">{TYPE_LABEL[r.type] ?? r.type}</Badge>
-          {r.cefr && <Badge tone="neutral" size="sm">{r.cefr}</Badge>}
-          <span style={{ flex: 1 }} />
-          {r.done ? (
-            <Badge tone="correct" size="sm" icon={<span>✓</span>}>{r.timesUsed}×</Badge>
-          ) : (
-            <Badge tone="neutral" size="sm">New</Badge>
-          )}
+    <Link href={`/level/${l.n}`} style={{ display: 'block' }}>
+      <Card padding="sm" interactive>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--fw-bold)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--text-faint)' }}>
+              Level {l.n}
+            </p>
+            <p style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-strong)', lineHeight: 'var(--leading-snug)' }}>
+              {prettyTheme(l.theme)}
+            </p>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{l.words} words</p>
+          </div>
+          <Badge tone={done ? 'correct' : 'primary'} size="sm">{done ? 'Done ✓' : 'Start'}</Badge>
         </div>
-        <p style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--fw-bold)', color: 'var(--text-strong)', lineHeight: 'var(--leading-snug)' }}>
-          {r.label}
-        </p>
-        {r.target && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>→ {r.target}</p>}
-      </div>
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
-export default function LibraryView({
-  summary,
-  initialRows,
-  initialTotal,
-}: {
-  summary: LibrarySummary;
-  initialRows: LibraryRow[];
-  initialTotal: number;
-}) {
-  const [status, setStatus] = useState<Status>('all');
-  const [type, setType] = useState('all');
-  const [rows, setRows] = useState(initialRows);
-  const [total, setTotal] = useState(initialTotal);
-  const [loading, setLoading] = useState(false);
-  const firstRender = useRef(true);
+export default function LibraryView({ data }: { data: VocabLevels }) {
+  const [filter, setFilter] = useState<Filter>('all');
 
-  useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
-    let active = true;
-    setLoading(true);
-    getLibraryPage({ status, type, offset: 0 }).then((res) => {
-      if (!active) return;
-      setRows(res.rows);
-      setTotal(res.total);
-      setLoading(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, [status, type]);
-
-  async function loadMore() {
-    setLoading(true);
-    const res = await getLibraryPage({ status, type, offset: rows.length });
-    setRows((r) => {
-      const seen = new Set(r.map((x) => x.id));
-      return [...r, ...res.rows.filter((x) => !seen.has(x.id))];
-    });
-    setTotal(res.total);
-    setLoading(false);
-  }
+  const filtered = useMemo(
+    () =>
+      data.levels.filter((l) => filter === 'all' || (filter === 'done' ? l.status === 'done' : l.status !== 'done')),
+    [data.levels, filter],
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-section)' }}>
-      <AppHeader title="Library" subtitle="Your exercise stock" />
+      <AppHeader title="Library" subtitle="All your exercises" />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
-        <Stat value={summary.total} label="Total" />
-        <Stat value={summary.done} label="Done" tone="primary" />
-        <Stat value={summary.todo} label="To-do" />
-      </div>
-
+      {/* Vocabulary */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <Segmented value={status} onChange={setStatus} />
-        <Select options={TYPE_OPTIONS} value={type} onChange={(e) => setType(e.target.value)} />
-      </div>
-
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)' }}>
-        Showing {rows.length} of {total}
-      </p>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {rows.length === 0 ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <p style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-strong)' }}>📚 Vocabulary</p>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{data.completedLevels}/{data.totalLevels} done</p>
+        </div>
+        <FilterTabs value={filter} onChange={setFilter} />
+        {filtered.map((l) => (
+          <LevelCard key={l.n} l={l} />
+        ))}
+        {filtered.length === 0 && (
           <Card padding="lg" style={{ textAlign: 'center' }}>
             <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>Nothing here.</p>
           </Card>
-        ) : (
-          rows.map((r) => <Row key={r.id} r={r} />)
         )}
       </div>
 
-      {rows.length < total && (
-        <Button variant="secondary" size="lg" block onClick={loadMore} disabled={loading}>
-          {loading ? 'Loading…' : `Load more (${total - rows.length})`}
-        </Button>
-      )}
+      {/* Grammar (future) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <p style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-strong)' }}>📐 Grammar</p>
+        <Card padding="md">
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+            No grammar exercises yet — they&apos;ll appear here once created.
+          </p>
+        </Card>
+      </div>
     </div>
   );
 }

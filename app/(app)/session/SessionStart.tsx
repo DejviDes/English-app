@@ -10,8 +10,6 @@ const SIZES = [10, 15, 20, 25];
 
 const TYPE_LABEL: Record<string, string> = {
   vocab_multiple_choice: 'Multiple choice (easiest)',
-  vocab_en_sk: 'EN → SK (type the answer)',
-  vocab_sk_en: 'SK → EN (type the answer)',
   vocab_fill_blank: 'Fill in the blank',
   vocab_matching: 'Matching',
   grammar_fill_form: 'Grammar: verb form',

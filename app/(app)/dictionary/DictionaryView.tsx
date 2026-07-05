@@ -2,17 +2,29 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AppHeader, Badge, Button, Card } from '@/components/ui/primitives';
-import { Input } from '@/components/ui/forms';
-import { searchWords } from '@/app/actions/dictionary';
+import { Input, Select } from '@/components/ui/forms';
+import { searchWords, type DictStatusFilter } from '@/app/actions/dictionary';
 import type { DictRow, WordStatus } from '@/lib/dictionary';
 
 const STATUS: Record<WordStatus, { tone: 'neutral' | 'almost' | 'primary' | 'correct'; label: string }> = {
   new: { tone: 'neutral', label: 'New' },
   learning: { tone: 'almost', label: 'Learning' },
-  daily: { tone: 'primary', label: 'Day ✓' },
-  review: { tone: 'correct', label: 'Reviewed' },
-  weekly: { tone: 'correct', label: 'Weekly 🏆' },
+  known: { tone: 'correct', label: 'Vedel ✓' },
 };
+
+const STATUS_TABS: { id: DictStatusFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'known', label: 'Known' },
+  { id: 'unknown', label: 'New' },
+];
+
+const CEFR_OPTIONS = [
+  { value: 'all', label: 'All levels' },
+  { value: 'A2', label: 'A2' },
+  { value: 'B1', label: 'B1' },
+  { value: 'B2', label: 'B2' },
+  { value: 'C1', label: 'C1' },
+];
 
 const SearchIcon = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -20,6 +32,32 @@ const SearchIcon = (
     <path d="m21 21-4.3-4.3" />
   </svg>
 );
+
+function StatusTabs({ value, onChange }: { value: DictStatusFilter; onChange: (v: DictStatusFilter) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: '4px', padding: '4px', background: 'var(--surface-inset)', borderRadius: 'var(--radius-pill)' }}>
+      {STATUS_TABS.map((o) => {
+        const on = value === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            style={{
+              flex: 1, border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-pill)',
+              padding: '8px 10px', fontSize: 'var(--text-sm)', fontWeight: 'var(--fw-bold)',
+              background: on ? 'var(--surface-card)' : 'transparent',
+              color: on ? 'var(--primary)' : 'var(--text-muted)',
+              boxShadow: on ? 'var(--shadow-sm)' : 'none',
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function WordRow({ r }: { r: DictRow }) {
   return (
@@ -46,12 +84,14 @@ export default function DictionaryView({
   initialTotal: number;
 }) {
   const [q, setQ] = useState('');
+  const [status, setStatus] = useState<DictStatusFilter>('all');
+  const [cefr, setCefr] = useState('all');
   const [rows, setRows] = useState(initialRows);
   const [total, setTotal] = useState(initialTotal);
   const [loading, setLoading] = useState(false);
   const firstRender = useRef(true);
 
-  // Debounced search on query change.
+  // Debounced refetch when the query or any filter changes.
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
@@ -60,7 +100,7 @@ export default function DictionaryView({
     let active = true;
     setLoading(true);
     const id = setTimeout(() => {
-      searchWords({ q, offset: 0 }).then((res) => {
+      searchWords({ q, offset: 0, status, cefr }).then((res) => {
         if (!active) return;
         setRows(res.rows);
         setTotal(res.total);
@@ -71,11 +111,11 @@ export default function DictionaryView({
       active = false;
       clearTimeout(id);
     };
-  }, [q]);
+  }, [q, status, cefr]);
 
   async function loadMore() {
     setLoading(true);
-    const res = await searchWords({ q, offset: rows.length });
+    const res = await searchWords({ q, offset: rows.length, status, cefr });
     setRows((r) => {
       const seen = new Set(r.map((x) => x.id));
       return [...r, ...res.rows.filter((x) => !seen.has(x.id))];
@@ -88,7 +128,11 @@ export default function DictionaryView({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-section)' }}>
       <AppHeader title="Words" subtitle={`${total} in your dictionary`} />
 
-      <Input placeholder="Search English or Slovak…" value={q} onChange={(e) => setQ(e.target.value)} iconLeft={SearchIcon} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <Input placeholder="Search English or Slovak…" value={q} onChange={(e) => setQ(e.target.value)} iconLeft={SearchIcon} />
+        <StatusTabs value={status} onChange={setStatus} />
+        <Select options={CEFR_OPTIONS} value={cefr} onChange={(e) => setCefr(e.target.value)} />
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {rows.length === 0 ? (

@@ -6,8 +6,6 @@ import SessionStart from './SessionStart';
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_TYPES = [
-  'vocab_en_sk',
-  'vocab_sk_en',
   'vocab_fill_blank',
   'vocab_multiple_choice',
   'vocab_matching',
