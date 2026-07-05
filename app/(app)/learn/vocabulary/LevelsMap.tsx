@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppHeader, Card } from '@/components/ui/primitives';
@@ -78,6 +79,12 @@ function ReviewRow({ block, status }: { block: number; status: ReviewStatus }) {
 export default function LevelsMap({ data }: { data: VocabLevels }) {
   const router = useRouter();
   const position = data.currentLevel ?? data.totalLevels;
+  const currentRef = useRef<HTMLDivElement>(null);
+
+  // On open, land on the current level instead of the top of the (long) path.
+  useEffect(() => {
+    currentRef.current?.scrollIntoView({ block: 'center' });
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-section)' }}>
@@ -98,7 +105,7 @@ export default function LevelsMap({ data }: { data: VocabLevels }) {
         {data.levels.map((l) => {
           const block = l.n / 5;
           return (
-            <div key={l.n}>
+            <div key={l.n} ref={l.n === data.currentLevel ? currentRef : undefined}>
               <LevelRow l={l} />
               {l.blockEnd && data.reviews[block] && <ReviewRow block={block} status={data.reviews[block]} />}
             </div>
