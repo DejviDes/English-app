@@ -6,7 +6,9 @@ import { completeLevel, saveLevelState, type RemainingItem } from '@/app/actions
 import type { FlashLesson } from '@/lib/repos/levels';
 import { AppHeader, Badge, Button, Card } from '@/components/ui/primitives';
 import { ProgressBar } from '@/components/ui/feedback';
+import { SpeakButton } from '@/components/SpeakButton';
 
+// Flashcard table runner: self-rated reveal, EN pronunciation + IPA, resumable.
 type Rating = 'knew' | 'almost' | 'didnt';
 
 function shuffle<T>(arr: T[]): T[] {
@@ -64,9 +66,14 @@ export default function FlashcardRunner({ lesson }: { lesson: FlashLesson }) {
           <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontSize: 'var(--text-sm)' }}>
             You knew every word both ways. Nice.
           </p>
-          <div style={{ marginTop: '20px' }}>
-            <Button variant="primary" size="lg" block onClick={() => router.push('/learn/vocabulary')}>
-              Back to levels
+          <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {lesson.nextN != null && (
+              <Button variant="primary" size="lg" block onClick={() => router.push(`/level/${lesson.nextN}`)}>
+                Ďalší level →
+              </Button>
+            )}
+            <Button variant={lesson.nextN != null ? 'secondary' : 'primary'} size="lg" block onClick={() => router.push('/learn/vocabulary')}>
+              Späť na levely
             </Button>
           </div>
         </Card>
@@ -91,6 +98,11 @@ export default function FlashcardRunner({ lesson }: { lesson: FlashLesson }) {
     if (nextRemaining.length > 0) {
       saveLevelState(lesson.kind, lesson.n, direction, nextRemaining).catch(() => {});
     }
+  }
+
+  function finishNow() {
+    completeLevel(lesson.kind, lesson.n).catch(() => {});
+    setCompleted(true);
   }
 
   function toNextPass() {
@@ -142,8 +154,16 @@ export default function FlashcardRunner({ lesson }: { lesson: FlashLesson }) {
           const tint = rating ? RATING_META[rating] : null;
           return (
             <Card key={id} padding="sm" style={tint ? { background: tint.bg, boxShadow: `inset 0 0 0 1px ${tint.ring}` } : undefined}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ flex: 1, minWidth: 0, fontWeight: 'var(--fw-bold)', color: 'var(--text-strong)' }}>{shown}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontWeight: 'var(--fw-bold)', color: 'var(--text-strong)', wordBreak: 'break-word' }}>{shown}</span>
+                    {direction === 0 && <SpeakButton text={w.en} size={28} />}
+                  </div>
+                  {direction === 0 && w.ipa && (
+                    <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-faint)', marginTop: '2px' }}>/{w.ipa}/</span>
+                  )}
+                </div>
                 {!isRevealed ? (
                   <button
                     onClick={() => setRevealed((s) => new Set(s).add(id))}
@@ -153,7 +173,15 @@ export default function FlashcardRunner({ lesson }: { lesson: FlashLesson }) {
                     {EyeIcon}
                   </button>
                 ) : (
-                  <span style={{ flex: 1, minWidth: 0, textAlign: 'right', color: tint ? tint.fg : 'var(--text-body)', fontWeight: 'var(--fw-semibold)' }}>{hidden}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                      {direction === 1 && <SpeakButton text={w.en} size={28} />}
+                      <span style={{ color: tint ? tint.fg : 'var(--text-body)', fontWeight: 'var(--fw-semibold)', wordBreak: 'break-word', textAlign: 'right' }}>{hidden}</span>
+                    </div>
+                    {direction === 1 && w.ipa && (
+                      <span style={{ display: 'block', textAlign: 'right', fontSize: 'var(--text-xs)', color: 'var(--text-faint)', marginTop: '2px' }}>/{w.ipa}/</span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -184,10 +212,15 @@ export default function FlashcardRunner({ lesson }: { lesson: FlashLesson }) {
         })}
       </div>
 
-      <div style={{ position: 'sticky', bottom: 'calc(84px + env(safe-area-inset-bottom))', marginTop: '18px', paddingTop: '14px', background: 'linear-gradient(to top, var(--bg-app) 80%, transparent)' }}>
+      <div style={{ position: 'sticky', bottom: 'calc(100px + env(safe-area-inset-bottom))', marginTop: '18px', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'linear-gradient(to top, var(--bg-app) 78%, transparent)' }}>
         <Button variant="primary" size="lg" block onClick={toNextPass} disabled={!allRated}>
-          {allRated ? (remaining.length === 0 ? (direction === 0 ? 'Switch to SK → EN' : 'Finish level') : 'Next round') : `Rate all ${table.length}`}
+          {allRated ? (remaining.length === 0 ? (direction === 0 ? 'Otočiť na SK → EN' : 'Dokončiť level') : 'Ďalšie kolo') : `Ohodnoť všetky (${table.length})`}
         </Button>
+        {allRated && remaining.length === 0 && direction === 0 && (
+          <Button variant="ghost" size="lg" block onClick={finishNow}>
+            Viem všetky — dokončiť bez otočenia
+          </Button>
+        )}
       </div>
     </div>
   );

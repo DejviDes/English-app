@@ -6,6 +6,7 @@ export interface DictRow {
   id: string;
   term: string; // EN
   translation: string; // SK
+  ipa: string | null; // IPA transcription
   theme: string | null;
   cefr: string | null;
   pos: string;

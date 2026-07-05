@@ -225,6 +225,7 @@ export interface GrammarLesson {
   topicSlug: string;
   topicName: string;
   completed: boolean;
+  nextN: number | null;
   items: GrammarRunnerItem[];
 }
 
@@ -238,12 +239,13 @@ export async function buildGrammarLevel(slug: string, n: number): Promise<Gramma
     .from('grammar_levels').select('id,n,title,sk_title').eq('topic_id', topic.id).eq('n', n).maybeSingle();
   if (!level) return null;
 
-  const [{ data: exercises }, { data: prog }] = await Promise.all([
+  const [{ data: exercises }, { data: prog }, { data: nextLvl }] = await Promise.all([
     supabase.from('exercises')
       .select('id,type,payload')
       .eq('grammar_level_id', level.id)
       .order('id', { ascending: true }),
     supabase.from('grammar_progress').select('completed').eq('level_id', level.id).maybeSingle(),
+    supabase.from('grammar_levels').select('n').eq('topic_id', topic.id).eq('n', (level.n as number) + 1).maybeSingle(),
   ]);
   if (!exercises || exercises.length === 0) return null;
 
@@ -255,6 +257,7 @@ export async function buildGrammarLevel(slug: string, n: number): Promise<Gramma
     topicSlug: topic.slug as string,
     topicName: topic.name as string,
     completed: (prog?.completed as boolean | undefined) ?? false,
+    nextN: nextLvl ? (level.n as number) + 1 : null,
     items: (exercises as { id: string; type: string; payload: GrammarRunnerItem['payload'] }[]).map((e) => ({
       exerciseId: e.id,
       type: e.type,

@@ -12,6 +12,7 @@ import { AppHeader, Badge, Button, Card } from '@/components/ui/primitives';
 import { ProgressBar, VerdictBanner } from '@/components/ui/feedback';
 import { ChoiceOption, PromptCard } from '@/components/ui/exercise';
 import { Input } from '@/components/ui/forms';
+import { SpeakButton } from '@/components/SpeakButton';
 
 const INSTRUCTION: Record<string, string> = {
   grammar_choose_option: 'Vyber správnu možnosť',
@@ -21,7 +22,7 @@ const INSTRUCTION: Record<string, string> = {
 
 const footerStyle: React.CSSProperties = {
   position: 'sticky',
-  bottom: 'calc(72px + env(safe-area-inset-bottom))',
+  bottom: 'calc(100px + env(safe-area-inset-bottom))',
   display: 'flex',
   flexDirection: 'column',
   gap: '8px',
@@ -90,8 +91,10 @@ export default function GrammarRunner({ lesson }: { lesson: GrammarLesson }) {
             <Badge tone="wrong" size="sm">✗ {counts.wrong}</Badge>
           </div>
           <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <Button variant="primary" size="lg" block onClick={() => router.push(backHref)}>Späť na čas</Button>
-            <Button variant="secondary" size="lg" block onClick={() => router.push('/learn/grammar')}>Gramatika</Button>
+            {lesson.nextN != null && (
+              <Button variant="primary" size="lg" block onClick={() => router.push(`/grammar/${lesson.topicSlug}/${lesson.nextN}`)}>Ďalší level →</Button>
+            )}
+            <Button variant={lesson.nextN != null ? 'secondary' : 'primary'} size="lg" block onClick={() => router.push(backHref)}>Späť na čas</Button>
           </div>
         </Card>
       </div>
@@ -147,7 +150,14 @@ export default function GrammarRunner({ lesson }: { lesson: GrammarLesson }) {
       <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--fw-bold)', color: 'var(--text-muted)', textAlign: 'center' }}>
         {INSTRUCTION[item.type] ?? ''}
       </p>
-      {promptText && <PromptCard prompt={promptText} hint={item.payload.hint} />}
+      {promptText && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <PromptCard prompt={promptText} hint={item.payload.hint} />
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <SpeakButton text={promptText.replace(/_+/g, ' blank ')} size={40} />
+          </div>
+        </div>
+      )}
 
       {!result ? (
         <>

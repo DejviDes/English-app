@@ -83,6 +83,7 @@ export interface FlashWord {
   id: string;
   en: string;
   sk: string;
+  ipa?: string | null;
 }
 export interface RemainingItem {
   id: string;
@@ -97,6 +98,7 @@ export interface FlashLesson {
   direction: number; // 0 = show EN/recall SK, 1 = show SK/recall EN
   remaining: RemainingItem[];
   completed: boolean;
+  nextN: number | null; // next level number (only for kind='level'), else null
 }
 
 async function loadProgress(kind: 'level' | 'review', n: number) {
@@ -110,28 +112,32 @@ async function loadProgress(kind: 'level' | 'review', n: number) {
   return data;
 }
 
-function wordsToFlash(rows: { id: string; term: string; translation: string }[]): FlashWord[] {
-  return rows.map((w) => ({ id: w.id, en: w.term, sk: w.translation }));
+function wordsToFlash(rows: { id: string; term: string; translation: string; ipa?: string | null }[]): FlashWord[] {
+  return rows.map((w) => ({ id: w.id, en: w.term, sk: w.translation, ipa: w.ipa ?? null }));
 }
 
 export async function buildLevel(n: number): Promise<FlashLesson | null> {
   const supabase = createServerClient();
   const { data: words } = await supabase
     .from('words')
-    .select('id,term,translation,theme')
+    .select('id,term,translation,theme,ipa')
     .eq('lvl', n)
     .order('term', { ascending: true });
   if (!words || words.length === 0) return null;
-  const prog = await loadProgress('level', n);
+  const [prog, { data: nextRow }] = await Promise.all([
+    loadProgress('level', n),
+    supabase.from('words').select('lvl').eq('lvl', n + 1).limit(1).maybeSingle(),
+  ]);
   return {
     kind: 'level',
     n,
     title: `Level ${n}`,
     theme: (words[0].theme as string | null) ?? null,
-    words: wordsToFlash(words as { id: string; term: string; translation: string }[]),
+    words: wordsToFlash(words as { id: string; term: string; translation: string; ipa?: string | null }[]),
     direction: (prog?.direction as number | undefined) ?? 0,
     remaining: (prog?.remaining as RemainingItem[] | undefined) ?? [],
     completed: (prog?.completed as boolean | undefined) ?? false,
+    nextN: nextRow ? n + 1 : null,
   };
 }
 
@@ -143,7 +149,7 @@ export async function buildReview(block: number): Promise<FlashLesson | null> {
   for (let l = from; l <= to; l++) lvls.push(l);
   const { data: words } = await supabase
     .from('words')
-    .select('id,term,translation')
+    .select('id,term,translation,ipa')
     .in('lvl', lvls)
     .order('term', { ascending: true });
   if (!words || words.length === 0) return null;
@@ -153,10 +159,11 @@ export async function buildReview(block: number): Promise<FlashLesson | null> {
     n: block,
     title: `Review ${block}`,
     theme: null,
-    words: wordsToFlash(words as { id: string; term: string; translation: string }[]),
+    words: wordsToFlash(words as { id: string; term: string; translation: string; ipa?: string | null }[]),
     direction: (prog?.direction as number | undefined) ?? 0,
     remaining: (prog?.remaining as RemainingItem[] | undefined) ?? [],
     completed: (prog?.completed as boolean | undefined) ?? false,
+    nextN: null,
   };
 }
 

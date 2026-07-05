@@ -25,7 +25,7 @@ export async function searchWords({
 
   let query = supabase
     .from('words')
-    .select('id,term,translation,theme,cefr_level,part_of_speech,known,lvl', { count: 'exact' })
+    .select('id,term,translation,ipa,theme,cefr_level,part_of_speech,known,lvl', { count: 'exact' })
     .order('term', { ascending: true })
     .order('id', { ascending: true })
     .range(offset, offset + DICT_PAGE - 1);
@@ -52,6 +52,7 @@ export async function searchWords({
     id: w.id as string,
     term: w.term as string,
     translation: w.translation as string,
+    ipa: (w.ipa as string | null) ?? null,
     theme: (w.theme as string | null) ?? null,
     cefr: (w.cefr_level as string | null) ?? null,
     pos: w.part_of_speech as string,

@@ -11,7 +11,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         className="lingua-app-column"
         style={{
           padding:
-            'calc(env(safe-area-inset-top) + 16px) var(--pad-screen) calc(88px + env(safe-area-inset-bottom))',
+            'calc(env(safe-area-inset-top) + 16px) var(--pad-screen) calc(104px + env(safe-area-inset-bottom))',
         }}
       >
         {children}

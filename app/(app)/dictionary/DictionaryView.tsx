@@ -5,6 +5,7 @@ import { AppHeader, Badge, Button, Card } from '@/components/ui/primitives';
 import { Input, Select } from '@/components/ui/forms';
 import { searchWords, type DictStatusFilter } from '@/app/actions/dictionary';
 import type { DictRow, WordStatus } from '@/lib/dictionary';
+import { SpeakButton } from '@/components/SpeakButton';
 
 const STATUS: Record<WordStatus, { tone: 'neutral' | 'almost' | 'primary' | 'correct'; label: string }> = {
   new: { tone: 'neutral', label: 'New' },
@@ -62,9 +63,11 @@ function StatusTabs({ value, onChange }: { value: DictStatusFilter; onChange: (v
 function WordRow({ r }: { r: DictRow }) {
   return (
     <Card padding="sm">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <SpeakButton text={r.term} size={34} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <p style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-strong)' }}>{r.term}</p>
+          {r.ipa && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)' }}>/{r.ipa}/</p>}
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-body)' }}>{r.translation}</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
