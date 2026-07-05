@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AppHeader, Badge, Card } from '@/components/ui/primitives';
 import type { LevelNode, VocabLevels } from '@/lib/repos/levels';
+import type { GrammarLibraryTopic } from '@/lib/repos/grammar';
 
 function prettyTheme(t: string | null): string {
   if (!t) return 'General';
@@ -65,7 +66,53 @@ function LevelCard({ l }: { l: LevelNode }) {
   );
 }
 
-export default function LibraryView({ data }: { data: VocabLevels }) {
+function matchFilter(done: boolean, filter: Filter): boolean {
+  return filter === 'all' || (filter === 'done' ? done : !done);
+}
+
+function GrammarSection({ topics, filter }: { topics: GrammarLibraryTopic[]; filter: Filter }) {
+  const totalLevels = topics.reduce((s, t) => s + t.levels.length, 0);
+  const doneLevels = topics.reduce((s, t) => s + t.levels.filter((l) => l.done).length, 0);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <p style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-strong)' }}>📐 Grammar</p>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{doneLevels}/{totalLevels} done</p>
+      </div>
+      {topics.length === 0 && (
+        <Card padding="md"><p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>No grammar yet.</p></Card>
+      )}
+      {topics.map((t) => {
+        const levels = t.levels.filter((l) => matchFilter(l.done, filter));
+        if (levels.length === 0) return null;
+        return (
+          <div key={t.slug} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <p style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-body)' }}>{t.name}</p>
+              <Badge tone="neutral" size="sm">{t.cefr}</Badge>
+            </div>
+            {levels.map((l) => (
+              <Link key={l.n} href={`/grammar/${t.slug}/${l.n}`} style={{ display: 'block' }}>
+                <Card padding="sm" interactive>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--fw-bold)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--text-faint)' }}>Level {l.n}</p>
+                      <p style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-strong)', lineHeight: 'var(--leading-snug)' }}>{l.skTitle ?? l.title}</p>
+                      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>{l.exercises} exercises</p>
+                    </div>
+                    <Badge tone={l.done ? 'correct' : 'primary'} size="sm">{l.done ? 'Done ✓' : 'Start'}</Badge>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function LibraryView({ data, grammar }: { data: VocabLevels; grammar: GrammarLibraryTopic[] }) {
   const [filter, setFilter] = useState<Filter>('all');
 
   const filtered = useMemo(
@@ -95,15 +142,8 @@ export default function LibraryView({ data }: { data: VocabLevels }) {
         )}
       </div>
 
-      {/* Grammar (future) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <p style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--fw-extrabold)', color: 'var(--text-strong)' }}>📐 Grammar</p>
-        <Card padding="md">
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
-            No grammar exercises yet — they&apos;ll appear here once created.
-          </p>
-        </Card>
-      </div>
+      {/* Grammar */}
+      <GrammarSection topics={grammar} filter={filter} />
     </div>
   );
 }

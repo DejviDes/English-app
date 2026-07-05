@@ -173,11 +173,14 @@ export interface Section {
 
 export async function getSections(): Promise<Section[]> {
   const supabase = createServerClient();
-  const [{ count: total }, { data: prog }] = await Promise.all([
+  const [{ count: total }, { data: prog }, { count: gTotal }, { data: gProg }] = await Promise.all([
     supabase.from('level_list').select('*', { count: 'exact', head: true }),
     supabase.from('level_progress').select('n,completed').eq('kind', 'level'),
+    supabase.from('grammar_levels').select('*', { count: 'exact', head: true }),
+    supabase.from('grammar_progress').select('completed'),
   ]);
   const done = (prog ?? []).filter((p) => p.completed).length;
+  const gDone = (gProg ?? []).filter((p) => p.completed).length;
 
   return [
     {
@@ -188,9 +191,15 @@ export async function getSections(): Promise<Section[]> {
       href: '/learn/vocabulary',
       progress: { done, total: total ?? 0 },
     },
-    { key: 'grammar', title: 'Grammar', subtitle: 'Coming soon', emoji: '📐', href: null },
+    {
+      key: 'grammar',
+      title: 'Grammar',
+      subtitle: 'Tenses — theory & exercises',
+      emoji: '📐',
+      href: '/learn/grammar',
+      progress: { done: gDone, total: gTotal ?? 0 },
+    },
     { key: 'word-order', title: 'Word order', subtitle: 'Coming soon', emoji: '🔤', href: null },
-    { key: 'tenses', title: 'Tenses', subtitle: 'Coming soon', emoji: '⏳', href: null },
   ];
 }
 
